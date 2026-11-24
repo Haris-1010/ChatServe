@@ -316,3 +316,7 @@ textarea { resize: vertical; }
   .card.flush { overflow-x: auto; }
   .search.inline { width: 100%; }
 }
+
+/* ---------- Accounts ---------- */
+.signed-in { margin: 0 4px 8px; overflow-wrap: anywhere; }
+.form-col.narrow { max-width: 460px; }

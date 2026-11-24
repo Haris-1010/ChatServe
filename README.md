@@ -38,6 +38,8 @@ While working on the dashboard (hot reload): keep the API running with `dotnet r
 
 Progress notes: `PROJECT_CONTEXT.md`, `docs/PHASE2_PROGRESS.md`, `docs/PHASE3_PROGRESS.md`, `docs/PHASE5_PROGRESS.md`.
 
+Running it for real shops: `docs/ONBOARDING.md` (going live, onboarding a restaurant, where its number goes, pricing). Current setup and next steps: `docs/HOW_IT_WORKS.md`.
+
 ```
 Customer (WhatsApp) → Meta Cloud API → POST /webhook → queue → MessageProcessingService
    → (blue tick + typing...) → ClaudeReplyGenerator (DB: menu + last 20 messages → Claude) → Graph API → reply to the customer

@@ -1,12 +1,14 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { Api, CurrentRestaurant, RestaurantProfile } from '../core/api';
+import { Auth } from '../core/auth';
 import { onRestaurant } from '../core/page';
 import { errorText, Toasts } from '../core/toast';
 
 @Component({
   selector: 'app-restaurant',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   template: `
     <div class="page-head"><h1>Restaurant info</h1></div>
 
@@ -20,8 +22,8 @@ import { errorText, Toasts } from '../core/toast';
 
         <div class="grid-2">
           <label class="field"><span>Restaurant name</span><input name="name" [(ngModel)]="r.name" /></label>
-          <label class="field"><span>WhatsApp Phone number ID</span><input name="pnid" [(ngModel)]="r.whatsAppPhoneNumberId" />
-            <small>The ID from Meta > API Setup. It tells the app which restaurant a message belongs to.</small></label>
+          <label class="field"><span>WhatsApp Phone number ID</span><input name="pnid" [(ngModel)]="r.whatsAppPhoneNumberId" [readonly]="!auth.isAdmin()" />
+            <small>The ID from Meta > API Setup. It tells the app which restaurant a message belongs to.@if (!auth.isAdmin()) { Only the admin can change it. }</small></label>
           <label class="field"><span>Staff / kitchen WhatsApp number</span><input name="staff" [(ngModel)]="r.staffWhatsAppNumber" placeholder="923001234567" />
             <small>Confirmed orders, bookings and handovers are sent here. Staff should send "start" to the business number once a day (24-hour window).</small></label>
           <label class="field"><span>Currency</span><input name="cur" [(ngModel)]="r.currency" /></label>
@@ -38,6 +40,7 @@ import { errorText, Toasts } from '../core/toast';
       </form>
     }
 
+    @if (auth.isAdmin()) {
     <section class="card">
       <h2>New restaurant (multi-tenant)</h2>
       <p class="muted small">Each restaurant has its own WhatsApp number (Phone number ID). One app can run many restaurants.</p>
@@ -46,13 +49,16 @@ import { errorText, Toasts } from '../core/toast';
         <label class="field grow"><span>Phone number ID</span><input name="np" [(ngModel)]="newPhoneId" /></label>
         <button class="btn">+ Create</button>
       </form>
+      <p class="muted small">Then give the owner a login on the <a routerLink="/users">Users</a> page.</p>
     </section>
+    }
   `,
 })
 export class RestaurantPage {
   private api = inject(Api);
   private toasts = inject(Toasts);
   private restaurants = inject(CurrentRestaurant);
+  protected auth = inject(Auth);
   p = signal<RestaurantProfile | null>(null);
   busy = signal(false);
   newName = '';

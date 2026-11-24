@@ -15,6 +15,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<TableBooking> TableBookings => Set<TableBooking>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
+    public DbSet<DashboardUser> DashboardUsers => Set<DashboardUser>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -95,6 +96,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             e.HasKey(x => x.Key);
             e.Property(x => x.Key).HasMaxLength(200);
+        });
+
+        b.Entity<DashboardUser>(e =>
+        {
+            e.HasIndex(x => x.Username).IsUnique();
+            e.HasIndex(x => x.RestaurantId);
+            e.Property(x => x.Username).HasMaxLength(50);
+            e.Property(x => x.PasswordHash).HasMaxLength(200);
+            e.Property(x => x.SecurityStamp).HasMaxLength(40);
+            e.HasOne<Restaurant>().WithMany().HasForeignKey(x => x.RestaurantId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<TableBooking>(e =>

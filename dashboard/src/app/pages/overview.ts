@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api, money, ORDER_STATUS_LABEL, ORDER_TYPE_LABEL, Overview, Status, when } from '../core/api';
+import { Auth } from '../core/auth';
 import { onRestaurant } from '../core/page';
 import { errorText, Toasts } from '../core/toast';
 
@@ -29,6 +30,7 @@ import { errorText, Toasts } from '../core/toast';
     }
 
     <div class="grid-2">
+      @if (auth.isAdmin()) {
       <section class="card">
         <h2>Setup checklist</h2>
         @if (status(); as st) {
@@ -47,6 +49,7 @@ import { errorText, Toasts } from '../core/toast';
           <a class="btn" routerLink="/settings">Open Settings →</a>
         }
       </section>
+      }
 
       <section class="card">
         <h2>Recent orders</h2>
@@ -83,7 +86,15 @@ export class OverviewPage {
   typeLabel = ORDER_TYPE_LABEL;
   private current = onRestaurant(rid => this.load(rid), 30);
 
+  protected auth = inject(Auth);
+
   constructor() {
+    this.loadStatus();
+  }
+
+  /** The setup checklist (keys, webhook) is only for the admin. */
+  private loadStatus() {
+    if (!this.auth.isAdmin()) return;
     this.api.status().then(s => this.status.set(s)).catch(e => this.toasts.error(errorText(e)));
   }
 
@@ -94,7 +105,7 @@ export class OverviewPage {
   refresh() {
     const id = this.current.id();
     if (id) this.load(id);
-    this.api.status().then(s => this.status.set(s)).catch(e => this.toasts.error(errorText(e)));
+    this.loadStatus();
   }
 
   copy(text: string) {

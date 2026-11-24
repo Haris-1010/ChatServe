@@ -125,6 +125,48 @@ namespace ChatServe.Api.Data.Migrations
                     b.ToTable("Customers");
                 });
 
+            modelBuilder.Entity("ChatServe.Api.Data.DashboardUser", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LastLoginAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("RestaurantId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RestaurantId");
+
+                    b.HasIndex("Username")
+                        .IsUnique();
+
+                    b.ToTable("DashboardUsers");
+                });
+
             modelBuilder.Entity("ChatServe.Api.Data.Deal", b =>
                 {
                     b.Property<int>("Id")
@@ -506,6 +548,15 @@ namespace ChatServe.Api.Data.Migrations
                 });
 
             modelBuilder.Entity("ChatServe.Api.Data.Customer", b =>
+                {
+                    b.HasOne("ChatServe.Api.Data.Restaurant", null)
+                        .WithMany()
+                        .HasForeignKey("RestaurantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ChatServe.Api.Data.DashboardUser", b =>
                 {
                     b.HasOne("ChatServe.Api.Data.Restaurant", null)
                         .WithMany()

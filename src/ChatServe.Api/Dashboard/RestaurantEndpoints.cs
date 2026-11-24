@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using ChatServe.Api.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,10 +9,16 @@ public static class RestaurantEndpoints
 {
     public static void MapRestaurantEndpoints(this RouteGroupBuilder api)
     {
-        api.MapGet("/restaurants", async (AppDbContext db, CancellationToken ct) =>
-            await db.Restaurants.AsNoTracking().OrderBy(r => r.Id)
+        // Admin sees every restaurant; an owner only their own.
+        api.MapGet("/restaurants", async (ClaimsPrincipal user, AppDbContext db, CancellationToken ct) =>
+        {
+            var own = user.OwnRestaurantId();
+            return await db.Restaurants.AsNoTracking()
+                .Where(r => own == null || r.Id == own)
+                .OrderBy(r => r.Id)
                 .Select(r => new { r.Id, r.Name, r.WhatsAppPhoneNumberId, r.IsBotEnabled })
-                .ToListAsync(ct));
+                .ToListAsync(ct);
+        });
 
         api.MapPost("/restaurants", async (NewRestaurantInput input, AppDbContext db, CancellationToken ct) =>
         {
@@ -25,7 +32,7 @@ public static class RestaurantEndpoints
             db.Restaurants.Add(r);
             await db.SaveChangesAsync(ct);
             return Results.Ok(new { r.Id });
-        });
+        }).RequireAuthorization(AccessControl.AdminPolicy);
 
         var one = api.MapGroup("/restaurants/{rid:int}");
 
@@ -34,10 +41,13 @@ public static class RestaurantEndpoints
                 ? Results.Ok(ToProfile(r))
                 : Results.NotFound());
 
-        one.MapPut("", async (int rid, RestaurantProfile input, AppDbContext db, CancellationToken ct) =>
+        one.MapPut("", async (int rid, RestaurantProfile input, ClaimsPrincipal user, AppDbContext db, CancellationToken ct) =>
         {
             var r = await db.Restaurants.FirstOrDefaultAsync(x => x.Id == rid, ct);
             if (r is null) return Results.NotFound();
+            // Only the admin may move a restaurant to another WhatsApp number.
+            if (!user.IsAdmin())
+                input = input with { WhatsAppPhoneNumberId = r.WhatsAppPhoneNumberId };
             if (string.IsNullOrWhiteSpace(input.Name) || string.IsNullOrWhiteSpace(input.WhatsAppPhoneNumberId))
                 return Bad("Name and WhatsApp Phone number ID are required.");
             var phoneId = input.WhatsAppPhoneNumberId.Trim();

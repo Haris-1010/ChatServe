@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/auth';
+import { adminGuard, authGuard } from './core/auth';
 import { Login } from './pages/login';
 import { Shell } from './pages/shell';
 
@@ -18,7 +18,9 @@ export const routes: Routes = [
       { path: 'bookings', loadComponent: () => import('./pages/bookings').then(m => m.BookingsPage) },
       { path: 'customers', loadComponent: () => import('./pages/customers').then(m => m.CustomersPage) },
       { path: 'restaurant', loadComponent: () => import('./pages/restaurant').then(m => m.RestaurantPage) },
-      { path: 'settings', loadComponent: () => import('./pages/settings').then(m => m.SettingsPage) },
+      { path: 'settings', canActivate: [adminGuard], loadComponent: () => import('./pages/settings').then(m => m.SettingsPage) },
+      { path: 'users', canActivate: [adminGuard], loadComponent: () => import('./pages/users').then(m => m.UsersPage) },
+      { path: 'account', loadComponent: () => import('./pages/account').then(m => m.AccountPage) },
     ],
   },
   { path: '**', redirectTo: '' },

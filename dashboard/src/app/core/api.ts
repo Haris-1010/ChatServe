@@ -70,6 +70,12 @@ export interface Setting {
 export interface SettingsResponse { settings: Setting[]; webhookUrl: string; database: string; }
 export interface TestResult { ok: boolean; message: string; }
 
+export type Role = 'admin' | 'owner';
+export interface Me { username: string; role: Role; restaurantId: number | null; }
+export interface DashboardUserRow {
+  id: number; username: string; restaurantId: number; restaurantName: string; createdAt: string; lastLoginAt: string | null;
+}
+
 export interface SimulatorResult {
   phone: string; reply: string | null; note: string | null; staffAlerts: string[]; usedAi: boolean; milliseconds: number;
 }
@@ -102,7 +108,14 @@ export class Api {
   private put<T>(url: string, body: unknown) { return firstValueFrom(this.http.put<T>(API_BASE + url, body)); }
   private del(url: string) { return firstValueFrom(this.http.delete<void>(API_BASE + url)); }
 
-  login(password: string) { return this.post<{ accessToken: string }>('/api/auth/login', { password }); }
+  login(username: string, password: string) { return this.post<{ accessToken: string }>('/api/auth/login', { username, password }); }
+  me() { return this.get<Me>('/api/me'); }
+  changePassword(currentPassword: string, newPassword: string) { return this.post<void>('/api/me/password', { currentPassword, newPassword }); }
+
+  users() { return this.get<DashboardUserRow[]>('/api/users'); }
+  createUser(username: string, password: string, restaurantId: number) { return this.post<{ id: number }>('/api/users', { username, password, restaurantId }); }
+  resetUserPassword(id: number, password: string) { return this.put<void>(`/api/users/${id}/password`, { password }); }
+  deleteUser(id: number) { return this.del(`/api/users/${id}`); }
 
   status() { return this.get<Status>('/api/status'); }
   settings() { return this.get<SettingsResponse>('/api/settings'); }

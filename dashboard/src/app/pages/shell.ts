@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { CurrentRestaurant } from '../core/api';
+import { Api, CurrentRestaurant } from '../core/api';
 import { Auth } from '../core/auth';
 import { errorText, Toasts } from '../core/toast';
 
@@ -13,7 +13,7 @@ import { errorText, Toasts } from '../core/toast';
       <aside class="sidebar">
         <div class="brand"><span class="logo">💬</span> ChatServe</div>
 
-        @if (restaurants.list().length > 0) {
+        @if (restaurants.list().length > 1) {
           <label class="field compact">
             <span>Restaurant</span>
             <select [ngModel]="restaurants.id()" (ngModelChange)="restaurants.select(+$event)">
@@ -35,10 +35,17 @@ import { errorText, Toasts } from '../core/toast';
           <a routerLink="/menu" routerLinkActive="active"><span>🍛</span> Menu, deals, FAQs</a>
           <a routerLink="/restaurant" routerLinkActive="active"><span>🏪</span> Restaurant info</a>
           <a routerLink="/simulator" routerLinkActive="active"><span>🧪</span> Bot test (simulator)</a>
-          <div class="nav-label">Setup</div>
-          <a routerLink="/settings" routerLinkActive="active"><span>⚙️</span> Settings</a>
+          @if (auth.isAdmin()) {
+            <div class="nav-label">Setup</div>
+            <a routerLink="/users" routerLinkActive="active"><span>🔑</span> Users (owner logins)</a>
+            <a routerLink="/settings" routerLinkActive="active"><span>⚙️</span> Settings</a>
+          } @else {
+            <div class="nav-label">Account</div>
+            <a routerLink="/account" routerLinkActive="active"><span>🔒</span> My account</a>
+          }
         </nav>
 
+        @if (auth.me(); as m) { <div class="muted small signed-in">Signed in as <b>{{ m.username }}</b>{{ m.role === 'admin' ? ' (admin)' : '' }}</div> }
         <button class="btn ghost block logout" (click)="logout()">Logout</button>
       </aside>
 
@@ -52,7 +59,7 @@ import { errorText, Toasts } from '../core/toast';
         </header>
         <main class="content">
           @if (loaded()) {
-            @if (restaurants.list().length === 0) {
+            @if (restaurants.list().length === 0 && auth.isAdmin()) {
               <div class="card empty">
                 <h2>No restaurant yet</h2>
                 <p class="muted">Add your WhatsApp <b>Phone number ID</b> in Settings and restart the app (a demo restaurant is created automatically), or create a new restaurant on the <a routerLink="/restaurant">Restaurant info</a> page.</p>
@@ -67,7 +74,8 @@ import { errorText, Toasts } from '../core/toast';
 })
 export class Shell implements OnInit {
   protected restaurants = inject(CurrentRestaurant);
-  private auth = inject(Auth);
+  protected auth = inject(Auth);
+  private api = inject(Api);
   private router = inject(Router);
   private toasts = inject(Toasts);
   navOpen = signal(false);
@@ -75,6 +83,7 @@ export class Shell implements OnInit {
 
   async ngOnInit() {
     try {
+      if (!this.auth.me()) this.auth.me.set(await this.api.me());
       await this.restaurants.load();
     } catch (e) {
       this.toasts.error(errorText(e));

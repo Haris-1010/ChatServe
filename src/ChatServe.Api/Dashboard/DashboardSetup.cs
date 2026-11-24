@@ -3,7 +3,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Serialization;
 using ChatServe.Api.Configuration;
+using ChatServe.Api.Data;
 using Microsoft.AspNetCore.Authentication.BearerToken;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 
 namespace ChatServe.Api.Dashboard;
@@ -23,7 +25,8 @@ public static class DashboardSetup
     {
         builder.Services.AddAuthentication(BearerTokenDefaults.AuthenticationScheme)
             .AddBearerToken(o => o.BearerTokenExpiration = TimeSpan.FromHours(12));
-        builder.Services.AddAuthorization();
+        builder.Services.AddAuthorization(o =>
+            o.AddPolicy(AccessControl.AdminPolicy, p => p.RequireRole(AccessControl.AdminRole)));
 
         builder.Services.ConfigureHttpJsonOptions(o =>
             o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -68,8 +71,27 @@ public static class DashboardSetup
     {
         var api = app.MapGroup("/api").RequireCors(CorsPolicy);
 
-        api.MapPost("/auth/login", async (LoginRequest req, IConfiguration config, IHostEnvironment env) =>
+        api.MapPost("/auth/login", async (LoginRequest req, IConfiguration config, IHostEnvironment env,
+            AppDbContext db, TimeProvider clock, CancellationToken ct) =>
         {
+            const string scheme = BearerTokenDefaults.AuthenticationScheme;
+            var username = UserEndpoints.NormalizeUsername(req.Username);
+
+            // Restaurant owner login
+            if (username.Length > 0 && username != AccessControl.AdminUsername)
+            {
+                var owner = await db.DashboardUsers.FirstOrDefaultAsync(u => u.Username == username, ct);
+                if (owner is null || !UserEndpoints.VerifyPassword(owner, req.Password ?? ""))
+                {
+                    await Task.Delay(500, ct); // make password guessing slow
+                    return Results.Problem("Wrong username or password.", statusCode: StatusCodes.Status401Unauthorized);
+                }
+                owner.LastLoginAt = clock.GetUtcNow();
+                await db.SaveChangesAsync(ct);
+                return Results.SignIn(AccessControl.OwnerPrincipal(owner, scheme), authenticationScheme: scheme);
+            }
+
+            // Admin login (username "admin" or empty, for older dashboards)
             var expected = AdminPassword(config, env);
             if (expected is null)
                 return Results.Problem(
@@ -78,19 +100,24 @@ public static class DashboardSetup
 
             if (!FixedTimeEquals(req.Password ?? "", expected))
             {
-                await Task.Delay(500); // make password guessing slow
-                return Results.Problem("Wrong password.", statusCode: StatusCodes.Status401Unauthorized);
+                await Task.Delay(500, ct); // make password guessing slow
+                return Results.Problem("Wrong username or password.", statusCode: StatusCodes.Status401Unauthorized);
             }
 
-            var principal = new ClaimsPrincipal(new ClaimsIdentity(
-                [new Claim(ClaimTypes.Name, "admin")], BearerTokenDefaults.AuthenticationScheme));
-            return Results.SignIn(principal, authenticationScheme: BearerTokenDefaults.AuthenticationScheme);
+            return Results.SignIn(AccessControl.AdminPrincipal(scheme), authenticationScheme: scheme);
         }).AllowAnonymous();
 
-        var admin = api.MapGroup("").RequireAuthorization();
+        // Everyone logged in (admin + restaurant owners). Owners are limited to their own {rid}.
+        var loggedIn = api.MapGroup("").RequireAuthorization()
+            .AddEndpointFilter<AccessControl.RestaurantAccessFilter>();
+        loggedIn.MapMeEndpoints();
+        loggedIn.MapRestaurantEndpoints();
+        loggedIn.MapOperationsEndpoints();
+
+        // Admin only: app settings, connection tests, setup status, owner logins.
+        var admin = api.MapGroup("").RequireAuthorization(AccessControl.AdminPolicy);
         admin.MapSettingsEndpoints();
-        admin.MapRestaurantEndpoints();
-        admin.MapOperationsEndpoints();
+        admin.MapUserAdminEndpoints();
 
         // Refreshing on Angular routes (/orders, /menu ...) returns index.html. /api and /webhook are excluded.
         if (HasBuiltDashboard(app.Environment))
@@ -101,5 +128,5 @@ public static class DashboardSetup
         CryptographicOperations.FixedTimeEquals(
             SHA256.HashData(Encoding.UTF8.GetBytes(a)), SHA256.HashData(Encoding.UTF8.GetBytes(b)));
 
-    public sealed record LoginRequest(string? Password);
+    public sealed record LoginRequest(string? Password, string? Username = null);
 }

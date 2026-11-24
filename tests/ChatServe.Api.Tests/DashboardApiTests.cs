@@ -16,9 +16,9 @@ namespace ChatServe.Api.Tests;
 /// <summary>The dashboard admin API: login, settings (from the DB, applied immediately), menu CRUD, simulator, orders.</summary>
 public class DashboardApiTests
 {
-    private const string Password = "test-pass";
+    internal const string Password = "test-pass";
 
-    private sealed class Factory : WebApplicationFactory<Program>
+    internal sealed class Factory : WebApplicationFactory<Program>
     {
         public FakeWhatsAppClient WhatsApp { get; } = new();
         public FakeChatCompletionClient Ai { get; } = new();
@@ -44,7 +44,7 @@ public class DashboardApiTests
         }
     }
 
-    private static async Task<(Factory Factory, HttpClient Client)> LoggedInAsync()
+    internal static async Task<(Factory Factory, HttpClient Client)> LoggedInAsync()
     {
         var factory = new Factory();
         var client = factory.CreateClient();
@@ -55,7 +55,7 @@ public class DashboardApiTests
         return (factory, client);
     }
 
-    private static async Task<int> RestaurantIdAsync(HttpClient c) =>
+    internal static async Task<int> RestaurantIdAsync(HttpClient c) =>
         (await c.GetFromJsonAsync<JsonElement>("/api/restaurants"))[0].GetProperty("id").GetInt32();
 
     [Fact]

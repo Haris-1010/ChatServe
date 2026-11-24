@@ -187,3 +187,19 @@ public sealed class AppSetting
     public string Value { get; set; } = string.Empty;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
+
+/// <summary>
+/// A restaurant owner's dashboard login. Owners only see and manage their own restaurant.
+/// The admin is not stored here: the admin logs in with Dashboard:AdminPassword.
+/// </summary>
+public sealed class DashboardUser
+{
+    public int Id { get; set; }
+    public required string Username { get; set; }          // stored lowercase, unique
+    public required string PasswordHash { get; set; }      // ASP.NET Core PasswordHasher (PBKDF2)
+    public int RestaurantId { get; set; }
+    /// <summary>Changes on password reset, so old login tokens stop working.</summary>
+    public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? LastLoginAt { get; set; }
+}
