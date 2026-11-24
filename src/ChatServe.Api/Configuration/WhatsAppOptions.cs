@@ -3,11 +3,11 @@ using System.ComponentModel.DataAnnotations;
 namespace ChatServe.Api.Configuration;
 
 /// <summary>
-/// Meta WhatsApp Cloud API settings. Secrets (AccessToken, AppSecret, VerifyToken) ko
-/// appsettings.json mein commit na karein: local par user-secrets, server par environment variables.
-/// Env var format: WhatsApp__AccessToken, WhatsApp__PhoneNumberId, waghera.
-/// Dashboard ke Settings page se bhi set ho sakti hain (DB mein save, restart ki zaroorat nahi).
-/// Tokens khali hon to bhi app chalti hai, taake pehli dafa dashboard se set kiye ja saken.
+/// Meta WhatsApp Cloud API settings. Don't commit secrets (AccessToken, AppSecret, VerifyToken)
+/// to appsettings.json: use user-secrets locally and environment variables on the server.
+/// Env var format: WhatsApp__AccessToken, WhatsApp__PhoneNumberId, etc.
+/// They can also be set from the dashboard's Settings page (saved in the DB, no restart needed).
+/// The app runs even with empty tokens, so they can be set from the dashboard the first time.
 /// </summary>
 public sealed class WhatsAppOptions
 {
@@ -19,19 +19,19 @@ public sealed class WhatsAppOptions
     [Required]
     public string GraphApiVersion { get; set; } = "v23.0";
 
-    /// <summary>Apni marzi ka random string. Yahi Meta dashboard mein "Verify token" mein daalna hai.</summary>
+    /// <summary>Any random string you choose. Enter the same value as the "Verify token" in the Meta dashboard.</summary>
     public string VerifyToken { get; set; } = string.Empty;
 
-    /// <summary>Temporary (24 ghante) ya System User ka permanent token.</summary>
+    /// <summary>A temporary (24-hour) token or a permanent System User token.</summary>
     public string AccessToken { get; set; } = string.Empty;
 
-    /// <summary>Default sender number. Webhook payload mein aane wala phone_number_id is par tarjeeh rakhta hai.</summary>
+    /// <summary>Default sender number. The phone_number_id in the webhook payload takes priority over it.</summary>
     public string PhoneNumberId { get; set; } = string.Empty;
 
-    /// <summary>App Settings &gt; Basic &gt; App secret. X-Hub-Signature-256 check karne ke liye.</summary>
+    /// <summary>App Settings &gt; Basic &gt; App secret. Used to check X-Hub-Signature-256.</summary>
     public string AppSecret { get; set; } = string.Empty;
 
-    /// <summary>Production mein hamesha true. Local testing mein false kar sakte hain.</summary>
+    /// <summary>Always true in production. Can be false for local testing.</summary>
     public bool ValidateSignature { get; set; } = true;
 }
 
@@ -39,12 +39,12 @@ public sealed class BotOptions
 {
     public const string SectionName = "Bot";
 
-    /// <summary>Phase 1 ka simple reply. {0} ki jagah customer ka message aata hai.</summary>
-    public string WelcomeMessage { get; set; } = "Assalam o Alaikum! Aap ka message mil gaya: \"{0}\"";
+    /// <summary>The simple Phase 1 reply. {0} is replaced with the customer's message.</summary>
+    public string WelcomeMessage { get; set; } = "Hello! We received your message: \"{0}\"";
 
-    /// <summary>Demo restaurant ka kitchen/staff WhatsApp number (923001234567). Confirmed orders yahan jaate hain.</summary>
+    /// <summary>Kitchen/staff WhatsApp number for the demo restaurant (923001234567). Confirmed orders are sent here.</summary>
     public string DemoStaffWhatsAppNumber { get; set; } = string.Empty;
 
-    /// <summary>false = Phase 1 wala simple welcome reply (AI kharcha zero).</summary>
+    /// <summary>false = the simple Phase 1 welcome reply (no AI cost).</summary>
     public bool UseAi { get; set; } = true;
 }

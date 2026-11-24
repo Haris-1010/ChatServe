@@ -4,9 +4,9 @@ using System.Text;
 namespace ChatServe.Api.WhatsApp;
 
 /// <summary>
-/// Meta har webhook POST ko App Secret se sign karta hai:
+/// Meta signs every webhook POST with the App Secret:
 /// header "X-Hub-Signature-256: sha256=&lt;hex HMAC-SHA256 of raw body&gt;".
-/// Is se pakka hota hai ke request waqai Meta se aayi hai, kisi aur ne nakli order nahi bheja.
+/// This proves the request really came from Meta and nobody sent a fake order.
 /// </summary>
 public static class WebhookSignatureValidator
 {
@@ -35,7 +35,7 @@ public static class WebhookSignatureValidator
         return CryptographicOperations.FixedTimeEquals(actual, expected);
     }
 
-    /// <summary>Tests aur local curl testing ke liye header value banata hai.</summary>
+    /// <summary>Builds the header value for tests and local curl testing.</summary>
     public static string ComputeHeader(ReadOnlySpan<byte> rawBody, string appSecret) =>
         Prefix + Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(appSecret), rawBody)).ToLowerInvariant();
 }

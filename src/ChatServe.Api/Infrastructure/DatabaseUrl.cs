@@ -5,8 +5,8 @@ namespace ChatServe.Api.Infrastructure;
 public static class DatabaseUrl
 {
     /// <summary>
-    /// Railway/Render "postgres://user:pass@host:port/db" URL dete hain; Npgsql ko key=value format chahiye.
-    /// Agar value pehle se key=value ho to waisi hi wapas.
+    /// Railway/Render give a "postgres://user:pass@host:port/db" URL; Npgsql needs key=value format.
+    /// If the value is already key=value, it is returned as is.
     /// </summary>
     public static string ToConnectionString(string value)
     {

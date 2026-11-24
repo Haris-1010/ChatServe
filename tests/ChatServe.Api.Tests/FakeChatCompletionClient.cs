@@ -11,7 +11,7 @@ public sealed class FakeChatCompletionClient : IChatCompletionClient
     public ConcurrentQueue<(string System, IReadOnlyList<ChatTurn> History, IReadOnlyList<AiTool> Tools)> Calls { get; } = new();
     public Func<IReadOnlyList<ChatTurn>, AiResult>? Responder { get; set; }
 
-    /// <summary>Asli Claude ki tarah tools chalane ke liye: test khud executor ko call karta hai.</summary>
+    /// <summary>Runs tools like real Claude would: the test calls the executor itself.</summary>
     public Func<IReadOnlyList<ChatTurn>, IToolExecutor, Task<AiResult>>? ToolScript { get; set; }
 
     public async Task<AiResult> CompleteAsync(string systemPrompt, IReadOnlyList<ChatTurn> history,
@@ -25,7 +25,7 @@ public sealed class FakeChatCompletionClient : IChatCompletionClient
                ?? new AiResult("AI: " + history[^1].Text.Split("\n\n[Current time")[0], false, 1000, 50, 900);
     }
 
-    /// <summary>Tool input ko Claude jaisi shakal (dictionary of JsonElement) mein badalta hai.</summary>
+    /// <summary>Converts tool input into Claude's shape (a dictionary of JsonElement).</summary>
     public static IReadOnlyDictionary<string, JsonElement> Input(object value) =>
         JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(JsonSerializer.Serialize(value))!;
 }

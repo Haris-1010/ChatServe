@@ -1,4 +1,4 @@
-# Dashboard (Angular) build: output src/ChatServe.Api/wwwroot mein jata hai
+# Dashboard (Angular) build: output goes to src/ChatServe.Api/wwwroot
 FROM node:22-alpine AS dashboard
 WORKDIR /repo/dashboard
 COPY dashboard/package.json dashboard/package-lock.json ./

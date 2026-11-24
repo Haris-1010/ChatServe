@@ -57,12 +57,12 @@ public static class SettingsEndpoints
             }
         });
 
-        // Meta se phone number ki details mangwa kar dekhte hain ke token + phone number ID sahi hain.
+        // Fetch the phone number details from Meta to check that the token + phone number ID are correct.
         api.MapPost("/settings/test/whatsapp", async (IOptionsMonitor<WhatsAppOptions> options, IHttpClientFactory http, CancellationToken ct) =>
         {
             var o = options.CurrentValue;
             if (string.IsNullOrWhiteSpace(o.AccessToken) || string.IsNullOrWhiteSpace(o.PhoneNumberId))
-                return Results.Ok(new TestResult(false, "Pehle Access token aur Phone number ID save karein."));
+                return Results.Ok(new TestResult(false, "Save the Access token and Phone number ID first."));
 
             var url = $"{o.GraphApiBaseUrl.TrimEnd('/')}/{o.GraphApiVersion}/{o.PhoneNumberId}?fields=display_phone_number,verified_name,quality_rating";
             using var msg = new HttpRequestMessage(HttpMethod.Get, url);
@@ -77,7 +77,7 @@ public static class SettingsEndpoints
                 {
                     var err = root.TryGetProperty("error", out var e) && e.TryGetProperty("message", out var m) ? m.GetString() : body;
                     var code = root.TryGetProperty("error", out var e2) && e2.TryGetProperty("code", out var c) ? $" (code {c})" : "";
-                    return Results.Ok(new TestResult(false, $"Meta ne inkaar kiya{code}: {err}"));
+                    return Results.Ok(new TestResult(false, $"Meta rejected the request{code}: {err}"));
                 }
 
                 string? Str(string name) => root.TryGetProperty(name, out var v) ? v.ToString() : null;
@@ -86,22 +86,22 @@ public static class SettingsEndpoints
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
             {
-                return Results.Ok(new TestResult(false, "Meta tak nahi pohanch sake: " + ex.Message));
+                return Results.Ok(new TestResult(false, "Could not reach Meta: " + ex.Message));
             }
         });
 
-        // Claude ko chhota sa sawal bhej kar API key aur model check.
+        // Send Claude a tiny question to check the API key and model.
         api.MapPost("/settings/test/ai", async (IChatCompletionClient ai, IOptionsMonitor<AiOptions> options, CancellationToken ct) =>
         {
             if (!AnthropicClientProvider.HasKey(options.CurrentValue))
-                return Results.Ok(new TestResult(false, "Pehle Anthropic API key save karein."));
+                return Results.Ok(new TestResult(false, "Save the Anthropic API key first."));
             try
             {
                 var result = await ai.CompleteAsync(
                     "You are a connection test. Reply with exactly: OK",
                     [new ChatTurn(true, "ping")], [], null, ct);
                 return Results.Ok(new TestResult(true,
-                    $"Claude ({options.CurrentValue.Model}) ne jawab diya: \"{result.Text}\" (in {result.InputTokens} / out {result.OutputTokens} tokens)"));
+                    $"Claude ({options.CurrentValue.Model}) replied: \"{result.Text}\" (in {result.InputTokens} / out {result.OutputTokens} tokens)"));
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -109,7 +109,7 @@ public static class SettingsEndpoints
             }
         });
 
-        // Dashboard ka home: kya kya set hai aur kya baqi hai.
+        // Dashboard home: what is set and what is still missing.
         api.MapGet("/status", async (AppDbContext db, IConfiguration config, IHostEnvironment env,
             IOptionsMonitor<WhatsAppOptions> wa, IOptionsMonitor<AiOptions> ai, IOptionsMonitor<BotOptions> bot,
             HttpRequest request, CancellationToken ct) =>
@@ -119,39 +119,39 @@ public static class SettingsEndpoints
 
             bool dbOk;
             try { dbOk = await db.Database.CanConnectAsync(ct); } catch { dbOk = false; }
-            checks.Add(new("Database", dbOk ? "ok" : "error", dbOk ? "PostgreSQL connected" : "Database se connect nahi ho saka"));
+            checks.Add(new("Database", dbOk ? "ok" : "error", dbOk ? "PostgreSQL connected" : "Could not connect to the database"));
 
             checks.Add(string.IsNullOrWhiteSpace(w.AccessToken)
-                ? new("WhatsApp access token", "error", "Settings > WhatsApp mein Access token daalein")
-                : new("WhatsApp access token", "ok", "Set hai (24 ghante wala token expire hota hai, Test dabayein)"));
+                ? new("WhatsApp access token", "error", "Add the Access token in Settings > WhatsApp")
+                : new("WhatsApp access token", "ok", "Set (temporary tokens expire after 24 hours; click Test)"));
 
             var restaurantForNumber = string.IsNullOrWhiteSpace(w.PhoneNumberId)
                 ? null
                 : await db.Restaurants.AsNoTracking().FirstOrDefaultAsync(r => r.WhatsAppPhoneNumberId == w.PhoneNumberId, ct);
             checks.Add(string.IsNullOrWhiteSpace(w.PhoneNumberId)
-                ? new("Phone number ID", "error", "Settings > WhatsApp mein Phone number ID daalein")
+                ? new("Phone number ID", "error", "Add the Phone number ID in Settings > WhatsApp")
                 : restaurantForNumber is null
-                    ? new("Phone number ID", "warn", $"{w.PhoneNumberId} kisi restaurant se linked nahi. Restaurant page par yahi ID daalein")
+                    ? new("Phone number ID", "warn", $"{w.PhoneNumberId} is not linked to any restaurant. Enter this ID on the Restaurant page")
                     : new("Phone number ID", "ok", $"{w.PhoneNumberId} → {restaurantForNumber.Name}"));
 
             checks.Add(string.IsNullOrWhiteSpace(w.VerifyToken)
-                ? new("Webhook verify token", "error", "Settings > WhatsApp mein Verify token daalein (Meta mein bhi yahi)")
-                : new("Webhook verify token", "ok", "Set hai"));
+                ? new("Webhook verify token", "error", "Add the Verify token in Settings > WhatsApp (and the same in Meta)")
+                : new("Webhook verify token", "ok", "Set"));
 
             checks.Add(!w.ValidateSignature
-                ? new("Webhook signature", "warn", "Signature check OFF hai. Live karne se pehle ON karein")
+                ? new("Webhook signature", "warn", "Signature check is OFF. Turn it ON before going live")
                 : string.IsNullOrWhiteSpace(w.AppSecret)
-                    ? new("Webhook signature", "error", "Signature check ON hai magar App secret nahi. Har webhook reject hoga")
+                    ? new("Webhook signature", "error", "Signature check is ON but there is no App secret. Every webhook will be rejected")
                     : new("Webhook signature", "ok", "App secret set, signature check ON"));
 
             checks.Add(!bot.CurrentValue.UseAi
-                ? new("AI (Claude)", "warn", "AI OFF hai: bot sirf welcome message bhejta hai")
+                ? new("AI (Claude)", "warn", "AI is OFF: the bot only sends the welcome message")
                 : AnthropicClientProvider.HasKey(ai.CurrentValue)
                     ? new("AI (Claude)", "ok", $"Key set, model {ai.CurrentValue.Model}")
-                    : new("AI (Claude)", "error", "Anthropic API key nahi. Bot har dafa \"maazrat\" wala jawab dega"));
+                    : new("AI (Claude)", "error", "No Anthropic API key. The bot will only send an \"apology\" reply"));
 
             if (DashboardSetup.UsingDefaultPassword(config, env))
-                checks.Add(new("Dashboard password", "warn", $"Default password \"{DashboardSetup.DevDefaultPassword}\" chal raha hai. Settings > Dashboard mein badlein"));
+                checks.Add(new("Dashboard password", "warn", $"Using the default password \"{DashboardSetup.DevDefaultPassword}\". Change it in Settings > Dashboard"));
 
             return Results.Ok(new
             {
@@ -164,7 +164,7 @@ public static class SettingsEndpoints
 
     internal static string WebhookUrl(HttpRequest request)
     {
-        // ngrok/Railway proxy ke peeche X-Forwarded-* headers se asal public URL
+        // Behind an ngrok/Railway proxy, get the real public URL from X-Forwarded-* headers
         var proto = request.Headers["X-Forwarded-Proto"].FirstOrDefault() ?? request.Scheme;
         var host = request.Headers["X-Forwarded-Host"].FirstOrDefault() ?? request.Host.Value;
         return $"{proto}://{host}/webhook";
@@ -178,7 +178,7 @@ public static class SettingsEndpoints
         if (string.IsNullOrWhiteSpace(raw))
             raw = config["DATABASE_URL"];
         if (string.IsNullOrWhiteSpace(raw))
-            return "(set nahi)";
+            return "(not set)";
         try
         {
             var b = new Npgsql.NpgsqlConnectionStringBuilder(DatabaseUrl.ToConnectionString(raw));
@@ -186,7 +186,7 @@ public static class SettingsEndpoints
         }
         catch
         {
-            return "(parse nahi ho saka)";
+            return "(could not parse)";
         }
     }
 

@@ -29,7 +29,7 @@ export const authGuard: CanActivateFn = () => {
   return auth.token() ? true : inject(Router).createUrlTree(['/login']);
 };
 
-/** Har API call ke saath token; 401 aaye (token expire) to login page. */
+/** Adds the token to every API call; on 401 (expired token) goes to the login page. */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(Auth);
   const router = inject(Router);

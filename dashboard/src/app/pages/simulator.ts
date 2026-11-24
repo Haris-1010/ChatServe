@@ -15,11 +15,11 @@ function newPhone() { return '000' + Math.floor(100000000 + Math.random() * 8999
   template: `
     <div class="page-head">
       <h1>Bot test (simulator)</h1>
-      <button class="btn ghost" (click)="reset()">+ Nayi chat</button>
+      <button class="btn ghost" (click)="reset()">+ New chat</button>
     </div>
-    <p class="muted">Yahan customer ban kar bot se baat karein, bilkul WhatsApp ki tarah. Asli WhatsApp ki zaroorat nahi:
-      jawab, orders aur bookings asal DB mein bante hain (Orders/Chats page par "Test" ke saath dikhte hain).
-      Kitchen ko jaane wale messages yahan peeli card mein dikhte hain. AI ke liye Settings mein Anthropic key chahiye.</p>
+    <p class="muted">Chat with the bot as a customer, just like on WhatsApp. No real WhatsApp needed:
+      replies, orders and bookings are saved to the real database (they show with a "Test" tag on the Orders and Chats pages).
+      Messages that would go to the kitchen show here in a yellow card. The AI needs an Anthropic key in Settings.</p>
 
     <div class="sim-wrap">
       <div class="phone">
@@ -38,7 +38,7 @@ function newPhone() { return '000' + Math.floor(100000000 + Math.random() * 8999
               </div>
             }
           } @empty {
-            <div class="sys">Kuch likh kar shuru karein, maslan: "Karahi kitne ki hai?" ya "DHA mein delivery hai?"</div>
+            <div class="sys">Type something to start, for example: "How much is the karahi?" or "Do you deliver to DHA?"</div>
           }
         </div>
         <form class="phone-input" (ngSubmit)="send()">
@@ -48,14 +48,14 @@ function newPhone() { return '000' + Math.floor(100000000 + Math.random() * 8999
       </div>
 
       <aside class="card sim-side">
-        <label class="field"><span>Customer ka naam</span><input [(ngModel)]="name" /></label>
+        <label class="field"><span>Customer name</span><input [(ngModel)]="name" /></label>
         <label class="field"><span>Test number</span><input [ngModel]="phone()" disabled /></label>
-        <div class="muted small">Test numbers "000" se shuru hote hain, in par asli WhatsApp nahi jata.</div>
-        <h3>Jaldi wale sawal</h3>
+        <div class="muted small">Test numbers start with "000". Nothing is sent to real WhatsApp.</div>
+        <h3>Quick questions</h3>
         <div class="chips">
           @for (q of quick; track q) { <button class="chip" (click)="text = q; send()" [disabled]="busy()">{{ q }}</button> }
         </div>
-        <p class="small muted">Bot ka jawab theek na lage to <a routerLink="/menu">Menu/FAQs</a> ya <a routerLink="/restaurant">Restaurant info</a> theek karein. Agle message se naya data use hota hai.</p>
+        <p class="small muted">If a reply looks wrong, fix the <a routerLink="/menu">Menu/FAQs</a> or <a routerLink="/restaurant">Restaurant info</a>. The bot uses the new data from the next message.</p>
       </aside>
     </div>
   `,
@@ -70,8 +70,8 @@ export class SimulatorPage {
   phone = signal(this.loadPhone());
   name = 'Test Customer';
   text = '';
-  quick = ['Menu bhej dein', 'Karahi kitne ki hai?', 'DHA mein delivery hai?', 'Family deal mein kya hai?',
-    '1 chicken karahi full aur 4 naan, Johar Town', 'confirm', 'Kal raat 9 baje 4 logon ki table book karni hai', 'Mera order kahan hai?'];
+  quick = ['Send me the menu', 'How much is the karahi?', 'Do you deliver to DHA?', "What's in the family deal?",
+    '1 full chicken karahi and 4 naan, Johar Town', 'confirm', 'Book a table for 4 tomorrow at 9 pm', 'Where is my order?'];
   private rid = computed(() => this.restaurants.id());
 
   private loadPhone() {
@@ -99,7 +99,7 @@ export class SimulatorPage {
       const res = await this.api.simulate(rid, this.phone(), this.name, text);
       if (res.reply) this.push({ from: 'bot', text: res.reply, meta: `${res.usedAi ? 'AI' : 'Welcome reply (AI OFF)'} · ${(res.milliseconds / 1000).toFixed(1)}s` });
       if (res.note) this.push({ from: 'system', text: res.note });
-      for (const a of res.staffAlerts) this.push({ from: 'staff', text: '📲 Kitchen/staff ko jata:\n' + a });
+      for (const a of res.staffAlerts) this.push({ from: 'staff', text: '📲 Would be sent to kitchen/staff:\n' + a });
     } catch (e) {
       this.toasts.error(errorText(e));
       this.push({ from: 'system', text: 'Error: ' + errorText(e) });

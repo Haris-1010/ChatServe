@@ -3,7 +3,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { API_BASE } from '../../environments';
 
-// ---------- Types (backend ke JSON ke mutabiq) ----------
+// ---------- Types (match the backend JSON) ----------
 
 export type OrderStatus = 'PendingConfirmation' | 'Confirmed' | 'Preparing' | 'OutForDelivery' | 'Completed' | 'Cancelled';
 export type OrderType = 'Delivery' | 'Takeaway' | 'DineIn';
@@ -77,11 +77,11 @@ export interface SimulatorResult {
 // ---------- Labels ----------
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
-  PendingConfirmation: 'Confirm baqi',
-  Confirmed: 'Naya (confirmed)',
-  Preparing: 'Tayyar ho raha',
-  OutForDelivery: 'Rider nikal gaya',
-  Completed: 'Mukammal',
+  PendingConfirmation: 'Awaiting confirmation',
+  Confirmed: 'New (confirmed)',
+  Preparing: 'Preparing',
+  OutForDelivery: 'Out for delivery',
+  Completed: 'Completed',
   Cancelled: 'Cancelled',
 };
 
@@ -115,7 +115,7 @@ export class Api {
   restaurant(rid: number) { return this.get<RestaurantProfile>(`/api/restaurants/${rid}`); }
   saveRestaurant(rid: number, p: RestaurantProfile) { return this.put<RestaurantProfile>(`/api/restaurants/${rid}`, p); }
 
-  /** Menu, deals, faqs, zones: ek hi tarah ke CRUD endpoints. */
+  /** Menu, deals, FAQs, zones: the same CRUD endpoints for each. */
   list<T>(rid: number, kind: 'menu' | 'deals' | 'faqs' | 'zones') { return this.get<T[]>(`/api/restaurants/${rid}/${kind}`); }
   create<T>(rid: number, kind: 'menu' | 'deals' | 'faqs' | 'zones', body: unknown) { return this.post<T>(`/api/restaurants/${rid}/${kind}`, body); }
   update<T>(rid: number, kind: 'menu' | 'deals' | 'faqs' | 'zones', id: number, body: unknown) { return this.put<T>(`/api/restaurants/${rid}/${kind}/${id}`, body); }
@@ -143,7 +143,7 @@ export class Api {
   }
 }
 
-// ---------- Kaunsa restaurant chuna hua hai ----------
+// ---------- Currently selected restaurant ----------
 
 const RKEY = 'chatserve.restaurant';
 
@@ -190,7 +190,7 @@ export function downloadCsv(filename: string, rows: (string | number | null | un
     const s = c === null || c === undefined ? '' : String(c);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   }).join(',')).join('\r\n');
-  // BOM taake Excel Urdu/emoji sahi dikhaye
+  // BOM so Excel shows non-Latin text and emoji correctly
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

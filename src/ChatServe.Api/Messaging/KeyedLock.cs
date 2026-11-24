@@ -1,6 +1,6 @@
 namespace ChatServe.Api.Messaging;
 
-/// <summary>Har key (customer) ke liye alag async lock. Istemal na ho to entry hat jati hai.</summary>
+/// <summary>A separate async lock per key (customer). The entry is removed when no longer in use.</summary>
 public sealed class KeyedLock
 {
     private readonly Dictionary<string, (SemaphoreSlim Semaphore, int RefCount)> _locks = new();

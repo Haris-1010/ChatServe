@@ -7,10 +7,10 @@ using Microsoft.Extensions.Options;
 
 namespace ChatServe.Api.Dashboard;
 
-/// <summary>Roz ka kaam: overview, live orders, bookings, customers, chats (staff reply, bot pause) aur chat simulator.</summary>
+/// <summary>Daily work: overview, live orders, bookings, customers, chats (staff reply, bot pause) and the chat simulator.</summary>
 public static class OperationsEndpoints
 {
-    /// <summary>Simulator ke customers ke number "000" se shuru hote hain. In ko asli WhatsApp nahi bheja jata.</summary>
+    /// <summary>Simulator customer numbers start with "000". Nothing is sent to them on real WhatsApp.</summary>
     public const string SimulatorPhonePrefix = "000";
 
     public static bool IsSimulated(string phone) => phone.StartsWith(SimulatorPhonePrefix, StringComparison.Ordinal);
@@ -24,7 +24,7 @@ public static class OperationsEndpoints
         {
             var now = clock.GetUtcNow();
             var pkNow = now.ToOffset(Money.PakistanOffset);
-            var dayStart = new DateTimeOffset(pkNow.Date, Money.PakistanOffset).ToUniversalTime(); // Pakistan ki aaj ki raat 12 baje (Postgres ko UTC chahiye)
+            var dayStart = new DateTimeOffset(pkNow.Date, Money.PakistanOffset).ToUniversalTime(); // midnight today in Pakistan (Postgres needs UTC)
 
             var orders = db.Orders.AsNoTracking().Where(o => o.RestaurantId == rid);
             var todayConfirmed = orders.Where(o => o.ConfirmedAt >= dayStart && o.Status != OrderStatus.Cancelled);
@@ -77,7 +77,7 @@ public static class OperationsEndpoints
             var order = await db.Orders.Include(o => o.Items).FirstOrDefaultAsync(o => o.Id == id && o.RestaurantId == rid, ct);
             if (order is null) return Results.NotFound();
             if (req.Status == OrderStatus.PendingConfirmation)
-                return RestaurantEndpoints.Bad("Order wapas 'confirm baqi' mein nahi ja sakta.");
+                return RestaurantEndpoints.Bad("An order can't go back to 'awaiting confirmation'.");
 
             var now = clock.GetUtcNow();
             order.Status = req.Status;
@@ -123,8 +123,8 @@ public static class OperationsEndpoints
                 var restaurant = await db.Restaurants.AsNoTracking().FirstAsync(r => r.Id == rid, ct);
                 var when = booking.BookingTime.ToOffset(Money.PakistanOffset).ToString("dddd d MMM, h:mm tt");
                 var text = req.Status == BookingStatus.Confirmed
-                    ? $"✅ {booking.CustomerName}, aap ki table booking confirm ho gayi hai: {when}, {booking.People} afraad. {restaurant.Name} mein aap ka intezar rahega!"
-                    : $"Maazrat {booking.CustomerName}, {when} wali table booking cancel kar di gayi hai. Kisi aur waqt ke liye isi chat par bata dein.";
+                    ? $"✅ {booking.CustomerName}, your table booking is confirmed: {when}, {booking.People} people. We look forward to seeing you at {restaurant.Name}!"
+                    : $"Sorry {booking.CustomerName}, your table booking for {when} has been cancelled. Message us here if you'd like another time.";
                 notifyError = await SendStaffMessageAsync(db, whatsApp, restaurant, booking.CustomerId, booking.Phone, text, clock.GetUtcNow(), ct);
             }
             return Results.Ok(new { booking, NotifyError = notifyError });
@@ -209,11 +209,11 @@ public static class OperationsEndpoints
             return Results.Ok(msgs);
         });
 
-        // Staff khud customer ko jawab deta hai (WhatsApp par restaurant ke number se).
+        // Staff reply to the customer themselves (on WhatsApp, from the restaurant's number).
         one.MapPost("/customers/{cid:int}/messages", async (int rid, int cid, StaffReply req, AppDbContext db,
             IWhatsAppClient whatsApp, IOptionsMonitor<OrderOptions> orderOptions, TimeProvider clock, CancellationToken ct) =>
         {
-            if (string.IsNullOrWhiteSpace(req.Text)) return RestaurantEndpoints.Bad("Message khali hai.");
+            if (string.IsNullOrWhiteSpace(req.Text)) return RestaurantEndpoints.Bad("The message is empty.");
             var c = await db.Customers.FirstOrDefaultAsync(x => x.Id == cid && x.RestaurantId == rid, ct);
             if (c is null) return Results.NotFound();
             var restaurant = await db.Restaurants.AsNoTracking().FirstAsync(r => r.Id == rid, ct);
@@ -231,7 +231,7 @@ public static class OperationsEndpoints
                 : Results.Problem(error, statusCode: StatusCodes.Status502BadGateway);
         });
 
-        // ---- Chat simulator: WhatsApp ke baghair bot test karna ----
+        // ---- Chat simulator: test the bot without WhatsApp ----
         one.MapPost("/simulator", async (int rid, SimulatorRequest req, AppDbContext db, IServiceScopeFactory scopes,
             IOptionsMonitor<Configuration.BotOptions> bot, TimeProvider clock, CancellationToken ct) =>
         {
@@ -258,9 +258,9 @@ public static class OperationsEndpoints
             if (reply is null)
             {
                 var customer = await db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.RestaurantId == rid && c.Phone == phone, ct);
-                note = !restaurant.IsBotEnabled ? "Bot is restaurant ke liye OFF hai (Restaurant page)."
-                    : customer?.BotPausedUntil > clock.GetUtcNow() ? "Is chat par bot paused hai (staff handover). Chats page se resume karein."
-                    : "Bot ne jawab nahi diya.";
+                note = !restaurant.IsBotEnabled ? "The bot is OFF for this restaurant (see the Restaurant page)."
+                    : customer?.BotPausedUntil > clock.GetUtcNow() ? "The bot is paused for this chat (staff handover). Resume it from the Chats page."
+                    : "The bot did not reply.";
             }
 
             return Results.Ok(new { Phone = phone, Reply = reply, Note = note, StaffAlerts = sim.StaffAlerts, UsedAi = bot.CurrentValue.UseAi, Milliseconds = ms });
@@ -272,17 +272,17 @@ public static class OperationsEndpoints
 
     internal static string OrderStatusMessage(Order o, string currency) => o.Status switch
     {
-        OrderStatus.Confirmed => $"✅ Aap ka order *#{o.Id}* confirm ho gaya hai. Total: *{OrderFormatter.TotalText(o, currency)}*",
-        OrderStatus.Preparing => $"👨‍🍳 Aap ka order *#{o.Id}* tayyar ho raha hai.",
-        OrderStatus.OutForDelivery => $"🛵 Aap ka order *#{o.Id}* rider le kar nikal gaya hai. Total: *{OrderFormatter.TotalText(o, currency)}*",
+        OrderStatus.Confirmed => $"✅ Your order *#{o.Id}* is confirmed. Total: *{OrderFormatter.TotalText(o, currency)}*",
+        OrderStatus.Preparing => $"👨‍🍳 Your order *#{o.Id}* is being prepared.",
+        OrderStatus.OutForDelivery => $"🛵 Your order *#{o.Id}* is out for delivery. Total: *{OrderFormatter.TotalText(o, currency)}*",
         OrderStatus.Completed => o.Type == OrderType.Takeaway
-            ? $"🎉 Aap ka order *#{o.Id}* tayyar hai, aa kar le jayen. Shukriya!"
-            : $"🙏 Order *#{o.Id}* mukammal. Hamein moqa dene ka shukriya! Khana kaisa laga, zaroor batayen.",
-        OrderStatus.Cancelled => $"Maazrat, aap ka order *#{o.Id}* cancel kar diya gaya hai. Kisi sawal ke liye isi chat par likhein.",
-        _ => $"Order *#{o.Id}* ka status: {o.Status}",
+            ? $"🎉 Your order *#{o.Id}* is ready for pickup. Thank you!"
+            : $"🙏 Order *#{o.Id}* is complete. Thank you for choosing us! Let us know how you liked the food.",
+        OrderStatus.Cancelled => $"Sorry, your order *#{o.Id}* has been cancelled. Message us here if you have any questions.",
+        _ => $"Order *#{o.Id}* status: {o.Status}",
     };
 
-    /// <summary>Staff ki taraf se WhatsApp message + chat log. Simulator customer ko WhatsApp nahi jata, sirf log. Error ho to message wapas.</summary>
+    /// <summary>A WhatsApp message from staff + chat log. Simulator customers get no WhatsApp, only the log. Returns the error message if any.</summary>
     private static async Task<string?> SendStaffMessageAsync(AppDbContext db, IWhatsAppClient whatsApp, Restaurant restaurant,
         int customerId, string phone, string text, DateTimeOffset now, CancellationToken ct, bool saveOnFailure = true)
     {
@@ -296,13 +296,13 @@ public static class OperationsEndpoints
             }
             catch (WhatsAppApiException ex)
             {
-                error = "WhatsApp ne message reject kiya" + (ex.ResponseBody?.Contains("131047") == true
-                    ? " (24 ghante ki window khatam, ab sirf template ja sakta hai)."
+                error = "WhatsApp rejected the message" + (ex.ResponseBody?.Contains("131047") == true
+                    ? " (the 24-hour window has closed; only a template message can be sent now)."
                     : $": {ex.Message}. {ex.ResponseBody}");
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
-                error = "WhatsApp tak nahi pohanch sake: " + ex.Message;
+                error = "Could not reach WhatsApp: " + ex.Message;
             }
         }
 

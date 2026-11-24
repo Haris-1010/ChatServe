@@ -7,9 +7,9 @@ using Microsoft.Extensions.Options;
 namespace ChatServe.Api.Messaging;
 
 /// <summary>
-/// Restaurant ka data (DB) + customer ki chat history → Claude (tools ke saath) → jawab.
-/// Har message (customer aur bot) DB mein save hota hai: memory bhi, aur baad mein dashboard ke liye log bhi.
-/// Order ka "confirm"/"cancel" AI ke baghair yahin handle hota hai: kitchen tak sirf customer ke confirm par jata hai.
+/// Restaurant data (DB) + the customer's chat history → Claude (with tools) → reply.
+/// Every message (customer and bot) is saved to the DB: it is the bot's memory and the dashboard's chat log.
+/// Order "confirm"/"cancel" is handled here without AI: an order only goes to the kitchen when the customer confirms.
 /// </summary>
 public sealed class ClaudeReplyGenerator(
     AppDbContext db,
@@ -21,10 +21,10 @@ public sealed class ClaudeReplyGenerator(
     ILogger<ClaudeReplyGenerator> logger) : IReplyGenerator
 {
     public const string NonTextReply =
-        "Maazrat, main abhi sirf text messages samajh sakta hoon. Meharbani kar ke apna sawal likh kar bhejein. 🙏";
+        "Sorry, I can only read text messages for now. Please type your question. 🙏";
 
     public const string FallbackReply =
-        "Maazrat, is waqt jawab dene mein masla aa raha hai. Hamara staff jald aap se rabta karega. 🙏";
+        "Sorry, we're having trouble replying right now. Our staff will contact you soon. 🙏";
 
     public async Task<string?> GenerateReplyAsync(IncomingMessage message, CancellationToken ct)
     {
@@ -43,7 +43,7 @@ public sealed class ClaudeReplyGenerator(
             return null;
         }
 
-        // App restart ke baad Meta ka retry: DB se bhi duplicate check.
+        // Meta retries after an app restart: also check the DB for duplicates.
         if (await db.ChatMessages.AnyAsync(m => m.WhatsAppMessageId == message.MessageId, ct))
             return null;
 
@@ -62,10 +62,10 @@ public sealed class ClaudeReplyGenerator(
         await db.SaveChangesAsync(ct);
 
         if (!restaurant.IsBotEnabled)
-            return null; // staff khud jawab dega (Phase 5: dashboard se)
+            return null; // staff will reply themselves (Phase 5: from the dashboard)
 
         if (customer.BotPausedUntil > now)
-            return null; // human handover: staff is customer se baat kar raha hai
+            return null; // human handover: staff are talking to this customer
 
         string reply;
         AiResult? result = null;
@@ -75,11 +75,11 @@ public sealed class ClaudeReplyGenerator(
 
         if (string.IsNullOrWhiteSpace(message.Text))
         {
-            reply = NonTextReply; // AI call ki zaroorat nahi, paisa bachao
+            reply = NonTextReply; // no AI call needed, save money
         }
         else if (pending is not null && OrderFormatter.IsConfirmation(message.Text, await SummaryWasLastBotMessageAsync(customer.Id, pending, ct)))
         {
-            // Customer ne khud confirm kiya: ab order kitchen jata hai. Fixed jawab, AI call nahi.
+            // The customer confirmed: the order now goes to the kitchen. Fixed reply, no AI call.
             await orders.ConfirmAsync(pending, now, ct);
             reply = OrderFormatter.ConfirmedReply(pending, restaurant.Currency);
             staffAlerts.Add(OrderFormatter.KitchenTicket(pending, restaurant.Currency));
@@ -114,7 +114,7 @@ public sealed class ClaudeReplyGenerator(
             newDraft = tools.Draft;
             staffAlerts.AddRange(tools.StaffAlerts);
 
-            // Hifazat: draft bana hai to customer ko sahi total zaroor dikhe, chahe AI ne summary chhor di ho.
+            // Safety net: if a draft was created, always show the customer the correct total, even if the AI left out the summary.
             if (newDraft is not null && !reply.Contains(OrderFormatter.TotalText(newDraft, restaurant.Currency), StringComparison.Ordinal))
             {
                 var summary = OrderFormatter.DraftSummary(newDraft, restaurant.Currency);
@@ -138,7 +138,7 @@ public sealed class ClaudeReplyGenerator(
 
         if (newDraft is not null)
         {
-            newDraft.SummaryChatMessageId = botMessage.Id; // "1" sirf isi summary ke foran baad confirm maana jayega
+            newDraft.SummaryChatMessageId = botMessage.Id; // "1" only counts as confirm right after this summary
             await db.SaveChangesAsync(ct);
         }
 
@@ -149,9 +149,9 @@ public sealed class ClaudeReplyGenerator(
     }
 
     public const string HandoverReply =
-        "Shukriya! Hamari team ka koi member jald aap se isi chat par rabta karega. 🙏";
+        "Thank you! A member of our team will reply to you here soon. 🙏";
 
-    /// <summary>"1" ko confirm tabhi maante hain jab customer ne summary ke foran baad likha ho (kisi aur sawal ka jawab na ho).</summary>
+    /// <summary>"1" only counts as confirm when the customer sends it right after the summary (not as an answer to some other question).</summary>
     private async Task<bool> SummaryWasLastBotMessageAsync(int customerId, Order pending, CancellationToken ct)
     {
         if (pending.SummaryChatMessageId is null)
@@ -164,7 +164,7 @@ public sealed class ClaudeReplyGenerator(
         return lastBotId == pending.SummaryChatMessageId;
     }
 
-    /// <summary>Tool calls history mein save nahi hote, is liye pending draft AI ko note ki shakal mein batate hain.</summary>
+    /// <summary>Tool calls aren't saved in history, so we tell the AI about the pending draft as a note.</summary>
     internal static string? PendingNote(Order? pending, string currency) => pending is null
         ? null
         : "[System note: this customer has an UNCONFIRMED order draft:\n" + OrderFormatter.DraftSummary(pending, currency) +
@@ -186,8 +186,8 @@ public sealed class ClaudeReplyGenerator(
     }
 
     /// <summary>
-    /// Aakhri N messages, Claude ke format mein: pehla message customer ka ho,
-    /// aur lagataar same role wale messages ek mein jod diye jayen.
+    /// The last N messages in Claude's format: the first message must be from the customer,
+    /// and consecutive messages with the same role are merged into one.
     /// </summary>
     private async Task<IReadOnlyList<ChatTurn>> LoadHistoryAsync(int customerId, CancellationToken ct)
     {
@@ -205,15 +205,15 @@ public sealed class ClaudeReplyGenerator(
     }
 
     /// <summary>
-    /// Pakistan ka mojooda waqt aakhri customer message ke saath (DB mein save nahi hota).
-    /// System prompt mein nahi daala taake prompt cache na toote.
+    /// The current Pakistan time, added to the last customer message (not saved to the DB).
+    /// Not put in the system prompt so the prompt cache isn't broken.
     /// </summary>
     internal static IReadOnlyList<ChatTurn> WithCurrentTime(IReadOnlyList<ChatTurn> turns, DateTimeOffset utcNow, string? extraNote = null)
     {
         if (turns.Count == 0 || !turns[^1].FromCustomer)
             return turns;
 
-        var pk = utcNow.ToOffset(Money.PakistanOffset); // PKT, daylight saving nahi
+        var pk = utcNow.ToOffset(Money.PakistanOffset); // PKT, no daylight saving
         var note = $"\n\n[Current time in Pakistan: {pk:dddd d MMMM yyyy, h:mm tt}]";
         if (extraNote is not null)
             note += "\n" + extraNote;
@@ -229,7 +229,7 @@ public sealed class ClaudeReplyGenerator(
         {
             var fromCustomer = role == ChatRole.Customer;
             if (turns.Count == 0 && !fromCustomer)
-                continue; // conversation customer se shuru honi chahiye
+                continue; // the conversation must start with the customer
 
             if (turns.Count > 0 && turns[^1].FromCustomer == fromCustomer)
                 turns[^1] = turns[^1] with { Text = turns[^1].Text + "\n" + text };

@@ -16,9 +16,9 @@ public sealed class WebhookController(
     ILogger<WebhookController> logger) : ControllerBase
 {
     /// <summary>
-    /// Meta verification. Dashboard mein "Verify and save" dabane par Meta ye call karta hai:
+    /// Meta verification. Meta calls this when you click "Verify and save" in its dashboard:
     /// GET /webhook?hub.mode=subscribe&amp;hub.verify_token=XYZ&amp;hub.challenge=12345
-    /// Token match ho to challenge plain text mein wapas karna hai.
+    /// If the token matches, return the challenge as plain text.
     /// </summary>
     [HttpGet]
     public IActionResult Verify(
@@ -39,13 +39,13 @@ public sealed class WebhookController(
     }
 
     /// <summary>
-    /// Meta yahan har naya message aur status update bhejta hai.
-    /// Foran 200 OK dena hai, asal kaam background queue mein hota hai.
+    /// Meta sends every new message and status update here.
+    /// Return 200 OK immediately; the real work happens in the background queue.
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> Receive(CancellationToken ct)
     {
-        // Signature check ke liye raw bytes chahiye, is liye [FromBody] use nahi kiya.
+        // The signature check needs the raw bytes, so [FromBody] isn't used.
         using var ms = new MemoryStream();
         await Request.Body.CopyToAsync(ms, ct);
         var rawBody = ms.ToArray();

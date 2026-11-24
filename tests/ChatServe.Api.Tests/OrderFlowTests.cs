@@ -53,7 +53,7 @@ public class OrderFlowTests
         notes = "",
     };
 
-    /// <summary>AI place_order call karta hai aur ek chhota jawab deta hai (summary khud nahi likhta).</summary>
+    /// <summary>The AI calls place_order and gives a short reply (it doesn't write the summary itself).</summary>
     private static void AiPlacesOrder(Ctx c, object order, string aiText = "Ye raha aap ka order:")
     {
         c.Ai.ToolScript = async (_, exec) =>
@@ -72,20 +72,20 @@ public class OrderFlowTests
 
         var summary = await gen.GenerateReplyAsync(Msg("2 full chicken karahi bhej dein, House 12 Block J Johar Town, Ali"), default);
 
-        // 2 x 2600 + 100 delivery: server ka hisaab, AI ka nahi
+        // 2 x 2600 + 100 delivery: the server's math, not the AI's
         Assert.Contains("Total: Rs 5,300", summary);
         Assert.Contains("confirm", summary);
         var draft = await c.Db.Orders.Include(o => o.Items).SingleAsync();
         Assert.Equal(OrderStatus.PendingConfirmation, draft.Status);
         Assert.Equal(5300, draft.Total);
-        Assert.Empty(c.Staff.Alerts); // confirm se pehle kitchen tak kuch nahi
+        Assert.Empty(c.Staff.Alerts); // nothing reaches the kitchen before confirm
 
         c.Ai.ToolScript = null;
         var callsBefore = c.Ai.Calls.Count;
         var confirmed = await gen.GenerateReplyAsync(Msg("Confirm kar dein"), default);
 
         Assert.Contains($"#{draft.Id}", confirmed);
-        Assert.Equal(callsBefore, c.Ai.Calls.Count); // confirm par AI call nahi
+        Assert.Equal(callsBefore, c.Ai.Calls.Count); // no AI call on confirm
         Assert.Equal(OrderStatus.Confirmed, (await c.Db.Orders.SingleAsync()).Status);
         var ticket = Assert.Single(c.Staff.Alerts);
         Assert.Contains("NEW ORDER", ticket);
@@ -101,14 +101,14 @@ public class OrderFlowTests
         AiPlacesOrder(c, DeliveryOrder(await c.CodeAsync("Chicken Karahi (Full)"), 1));
         await gen.GenerateReplyAsync(Msg("ek full karahi"), default);
 
-        // Summary ke baad koi aur sawal-jawab hua: ab "1" confirm nahi (shayad kisi aur sawal ka jawab hai)
+        // Another exchange happened after the summary: "1" is no longer a confirm (it may answer another question)
         c.Ai.ToolScript = null;
         c.Ai.Responder = _ => new AiResult("Ji, kitne log aayenge?", false, 1, 1, 0);
         await gen.GenerateReplyAsync(Msg("table bhi book ho sakta hai?"), default);
         await gen.GenerateReplyAsync(Msg("1"), default);
         Assert.Equal(OrderStatus.PendingConfirmation, (await c.Db.Orders.SingleAsync()).Status);
 
-        // Naya summary bheja gaya, phir "1" = confirm
+        // A new summary was sent, then "1" = confirm
         AiPlacesOrder(c, DeliveryOrder(await c.CodeAsync("Chicken Karahi (Full)"), 1));
         await gen.GenerateReplyAsync(Msg("theek hai order wahi rakhein"), default);
         await gen.GenerateReplyAsync(Msg("1"), default);
@@ -167,7 +167,7 @@ public class OrderFlowTests
         Assert.Contains("Quantity", await Try(DeliveryOrder(await c.CodeAsync("Naan"), 500)));
         Assert.Empty(c.Db.Orders);
 
-        // Takeaway par minimum order aur delivery charge nahi
+        // No minimum order or delivery charge for takeaway
         var takeaway = new
         {
             items = new[] { new { code = await c.CodeAsync("Naan"), quantity = 2, note = "" }, new { code = "D" + (await c.Db.Deals.FirstAsync()).Id, quantity = 1, note = "" } },
@@ -195,7 +195,7 @@ public class OrderFlowTests
 
         Assert.Contains("Complaint: khana thanda tha", Assert.Single(c.Staff.Alerts));
         Assert.True((await c.Db.Customers.SingleAsync()).BotPausedUntil > DateTimeOffset.UtcNow);
-        Assert.Null(await gen.GenerateReplyAsync(Msg("hello?"), default)); // ab staff baat karega
+        Assert.Null(await gen.GenerateReplyAsync(Msg("hello?"), default)); // staff take over now
         Assert.Equal(callsAfterHandover, c.Ai.Calls.Count);
     }
 

@@ -9,14 +9,14 @@ using Microsoft.Extensions.FileProviders;
 namespace ChatServe.Api.Dashboard;
 
 /// <summary>
-/// Dashboard (Angular) ke liye: login (bearer token), CORS, JSON, aur built Angular files (wwwroot) serve karna.
-/// Saare admin endpoints /api ke neeche hain aur login ke baghair nahi chalte.
+/// For the Angular dashboard: login (bearer token), CORS, JSON, and serving the built Angular files (wwwroot).
+/// All admin endpoints live under /api and require login.
 /// </summary>
 public static class DashboardSetup
 {
     public const string CorsPolicy = "dashboard";
 
-    /// <summary>Development mein password set na ho to yahi chalta hai (dashboard par warning dikhti hai).</summary>
+    /// <summary>Used in Development when no password is set (the dashboard shows a warning).</summary>
     public const string DevDefaultPassword = "admin";
 
     public static void AddDashboard(this WebApplicationBuilder builder)
@@ -28,7 +28,7 @@ public static class DashboardSetup
         builder.Services.ConfigureHttpJsonOptions(o =>
             o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
-        // Dashboard alag domain (maslan Vercel) par ho to: Dashboard:AllowedOrigins = "https://chatserve.vercel.app"
+        // If the dashboard is on another domain (e.g. Vercel): Dashboard:AllowedOrigins = "https://chatserve.vercel.app"
         var origins = (builder.Configuration["Dashboard:AllowedOrigins"] ?? "")
             .Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
         builder.Services.AddCors(o => o.AddPolicy(CorsPolicy, p =>
@@ -40,7 +40,7 @@ public static class DashboardSetup
         builder.Services.AddHttpClient("graph", c => c.Timeout = TimeSpan.FromSeconds(15));
     }
 
-    /// <summary>Effective dashboard password. null = koi password set nahi (Production mein login band).</summary>
+    /// <summary>The effective dashboard password. null = no password set (login is disabled in Production).</summary>
     public static string? AdminPassword(IConfiguration config, IHostEnvironment env)
     {
         var configured = config["Dashboard:AdminPassword"];
@@ -54,7 +54,7 @@ public static class DashboardSetup
 
     public static void UseDashboardStaticFiles(this WebApplication app)
     {
-        // Angular build (npm run build) yahan files rakhta hai. Na hon to sirf API chalti hai.
+        // The Angular build (npm run build) puts files here. Without them only the API runs.
         if (!HasBuiltDashboard(app.Environment))
             return;
         app.UseDefaultFiles();
@@ -73,13 +73,13 @@ public static class DashboardSetup
             var expected = AdminPassword(config, env);
             if (expected is null)
                 return Results.Problem(
-                    "Dashboard password set nahi hai. Server par env var Dashboard__AdminPassword set karein.",
+                    "The dashboard password is not set. Set the Dashboard__AdminPassword env var on the server.",
                     statusCode: StatusCodes.Status503ServiceUnavailable);
 
             if (!FixedTimeEquals(req.Password ?? "", expected))
             {
-                await Task.Delay(500); // password guess karna mehenga ho
-                return Results.Problem("Password ghalat hai.", statusCode: StatusCodes.Status401Unauthorized);
+                await Task.Delay(500); // make password guessing slow
+                return Results.Problem("Wrong password.", statusCode: StatusCodes.Status401Unauthorized);
             }
 
             var principal = new ClaimsPrincipal(new ClaimsIdentity(
@@ -92,7 +92,7 @@ public static class DashboardSetup
         admin.MapRestaurantEndpoints();
         admin.MapOperationsEndpoints();
 
-        // Angular routes (/orders, /menu ...) par refresh karein to index.html mile. /api aur /webhook is se bahar.
+        // Refreshing on Angular routes (/orders, /menu ...) returns index.html. /api and /webhook are excluded.
         if (HasBuiltDashboard(app.Environment))
             app.MapFallbackToFile("{*path:nonfile:regex(^(?!api/|webhook).*$)}", "index.html");
     }

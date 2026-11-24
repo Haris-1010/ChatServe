@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace ChatServe.Api.WhatsApp.Models;
 
-// Meta webhook payload (field = "messages") ke sirf woh hisse jo hamein chahiye.
+// Only the parts of the Meta webhook payload (field = "messages") that we need.
 // Docs: https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/components
 
 public sealed class WebhookPayload
@@ -37,7 +37,7 @@ public sealed class WebhookMetadata
 {
     [JsonPropertyName("display_phone_number")] public string? DisplayPhoneNumber { get; set; }
 
-    /// <summary>Multi-tenant mein isi se restaurant pehchana jayega.</summary>
+    /// <summary>Used to identify the restaurant (multi-tenant).</summary>
     [JsonPropertyName("phone_number_id")] public string? PhoneNumberId { get; set; }
 }
 

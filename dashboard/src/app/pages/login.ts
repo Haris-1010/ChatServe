@@ -12,14 +12,14 @@ import { errorText } from '../core/toast';
     <div class="login-wrap">
       <form class="card login" (ngSubmit)="submit()">
         <div class="brand big"><span class="logo">💬</span> ChatServe</div>
-        <p class="muted">Restaurant WhatsApp AI agent ka dashboard</p>
+        <p class="muted">Dashboard for your restaurant's WhatsApp AI agent</p>
         <label class="field">
           <span>Password</span>
           <input type="password" name="password" [(ngModel)]="password" autofocus autocomplete="current-password" />
         </label>
         @if (error()) { <div class="alert error">{{ error() }}</div> }
-        <button class="btn primary block" [disabled]="busy() || !password">{{ busy() ? 'Login ho raha hai…' : 'Login' }}</button>
-        <p class="muted small">Local (Development) mein default password <code>admin</code> hai. Login ke baad Settings se badal lein.</p>
+        <button class="btn primary block" [disabled]="busy() || !password">{{ busy() ? 'Logging in…' : 'Login' }}</button>
+        <p class="muted small">In local development the default password is <code>admin</code>. Change it in Settings after you log in.</p>
       </form>
     </div>
   `,

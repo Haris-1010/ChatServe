@@ -9,19 +9,19 @@ import { errorText, Toasts } from '../core/toast';
   template: `
     <div class="page-head">
       <h1>Settings</h1>
-      <button class="btn primary" [disabled]="!dirty() || busy()" (click)="save()">{{ busy() ? 'Save ho raha…' : 'Save' }}</button>
+      <button class="btn primary" [disabled]="!dirty() || busy()" (click)="save()">{{ busy() ? 'Saving…' : 'Save' }}</button>
     </div>
-    <p class="muted">Yahan save ki gayi settings database mein jati hain, foran lagu hoti hain (restart nahi), aur appsettings/env vars par tarjeeh rakhti hain.
-      "Wapas default" se dashboard wali value hat jati hai.</p>
+    <p class="muted">Settings saved here go to the database, apply immediately (no restart), and take priority over appsettings / env vars.
+      "Reset to default" removes the dashboard value.</p>
 
     @if (data(); as d) {
       <section class="card">
-        <h2>Webhook (Meta mein yahi daalna hai)</h2>
+        <h2>Webhook (enter this in Meta)</h2>
         <div class="kv"><span>Callback URL</span><code class="copy" (click)="copy(d.webhookUrl)">{{ d.webhookUrl }}</code></div>
-        <div class="muted small">Local par Meta tak pohanchne ke liye ngrok chahiye: <code>ngrok http 5040</code>, phir ngrok wala https URL + /webhook.
-          Meta > WhatsApp > Configuration > Webhook > Edit, verify token neeche wala, aur "messages" field subscribe karein.</div>
+        <div class="muted small">Locally, Meta needs ngrok to reach you: <code>ngrok http 5040</code>, then the ngrok https URL + /webhook.
+          In Meta > WhatsApp > Configuration > Webhook > Edit, use the verify token below and subscribe to the "messages" field.</div>
         <div class="kv"><span>Database</span><code>{{ d.database }}</code></div>
-        <div class="muted small">Database ki setting yahan se nahi badalti: appsettings / user-secrets / DATABASE_URL.</div>
+        <div class="muted small">The database setting can't be changed here: use appsettings / user-secrets / DATABASE_URL.</div>
       </section>
 
       @for (g of groups(); track g) {
@@ -55,10 +55,10 @@ import { errorText, Toasts } from '../core/toast';
                   @case ('secret') {
                     <div class="row">
                       <input [type]="reveal[s.key] ? 'text' : 'password'" autocomplete="new-password"
-                        [placeholder]="s.isSet ? 'Set hai (' + s.hint + '). Badalne ke liye nayi value likhein' : 'Set nahi'"
+                        [placeholder]="s.isSet ? 'Set (' + s.hint + '). Type a new value to change it' : 'Not set'"
                         [ngModel]="edits[s.key] ?? ''" (ngModelChange)="set(s, $event)" />
                       <button class="btn ghost sm" type="button" (click)="reveal[s.key] = !reveal[s.key]">{{ reveal[s.key] ? '🙈' : '👁' }}</button>
-                      @if (s.key === 'WhatsApp:VerifyToken') { <button class="btn ghost sm" type="button" (click)="generate(s)">🎲 Banayein</button> }
+                      @if (s.key === 'WhatsApp:VerifyToken') { <button class="btn ghost sm" type="button" (click)="generate(s)">🎲 Generate</button> }
                     </div>
                   }
                   @default {
@@ -68,7 +68,7 @@ import { errorText, Toasts } from '../core/toast';
                   }
                 }
                 <small>{{ s.help }}</small>
-                @if (s.source === 'dashboard') { <button class="link small" type="button" (click)="clear(s)">Wapas default</button> }
+                @if (s.source === 'dashboard') { <button class="link small" type="button" (click)="clear(s)">Reset to default</button> }
               </div>
             }
           </div>
@@ -84,10 +84,10 @@ export class SettingsPage {
   busy = signal(false);
   testing = signal(false);
   results = signal<Record<string, TestResult>>({});
-  /** key → nayi value (string) ya null (dashboard wali value hatao). */
+  /** key → new value (string), or null (remove the dashboard value). */
   edits: Record<string, string | null> = {};
   reveal: Record<string, boolean> = {};
-  private version = signal(0); // edits badle to dirty() dobara chale
+  private version = signal(0); // bump when edits change so dirty() re-runs
   dirty = computed(() => (this.version(), Object.keys(this.edits).length > 0));
   groups = computed(() => [...new Set(this.data()?.settings.map(s => s.group) ?? [])]);
   sourceLabel = { dashboard: 'Dashboard', config: 'appsettings / env', default: 'Default' };
@@ -127,7 +127,7 @@ export class SettingsPage {
     this.reveal[s.key] = true;
     this.set(s, token);
     navigator.clipboard?.writeText(token).catch(() => undefined);
-    this.toasts.ok('Naya token ban gaya (copy bhi ho gaya). Save dabayein, phir Meta mein yahi daalein.');
+    this.toasts.ok('New token generated and copied. Click Save, then enter the same token in Meta.');
   }
 
   async save() {
@@ -135,7 +135,7 @@ export class SettingsPage {
     try {
       const changedPassword = this.edits['Dashboard:AdminPassword'];
       await this.api.saveSettings(this.edits);
-      this.toasts.ok(changedPassword ? 'Save ho gaya. Agli dafa naye password se login karein.' : 'Settings save ho gayin, foran lagu.');
+      this.toasts.ok(changedPassword ? 'Saved. Use the new password next time you log in.' : 'Settings saved and applied.');
       await this.load();
     } catch (e) {
       this.toasts.error(errorText(e));
@@ -145,7 +145,7 @@ export class SettingsPage {
   }
 
   async test(kind: 'whatsapp' | 'ai') {
-    if (this.dirty()) { this.toasts.error('Pehle Save karein, phir test.'); return; }
+    if (this.dirty()) { this.toasts.error('Save first, then test.'); return; }
     this.testing.set(true);
     try {
       const r = kind === 'whatsapp' ? await this.api.testWhatsApp() : await this.api.testAi();
@@ -157,5 +157,5 @@ export class SettingsPage {
     }
   }
 
-  copy(text: string) { navigator.clipboard?.writeText(text).then(() => this.toasts.ok('Copy ho gaya'), () => this.toasts.error('Copy nahi ho saka, khud select kar ke copy karein')); }
+  copy(text: string) { navigator.clipboard?.writeText(text).then(() => this.toasts.ok('Copied'), () => this.toasts.error('Could not copy. Please select the text and copy it yourself')); }
 }

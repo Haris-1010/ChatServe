@@ -1,26 +1,26 @@
 # Phase 2 Progress: Claude AI + menu + chat memory
 
-> Naye session ke liye: pehle `PROJECT_CONTEXT.md` parhein, phir ye file. Jo ✅ hai use dobara mat banao.
+> For a new session: read `PROJECT_CONTEXT.md` first, then this file. Don't rebuild anything marked ✅.
 
-## Faisle (Phase 2)
-| Cheez | Faisla |
+## Decisions (Phase 2)
+| Item | Decision |
 |---|---|
 | Claude SDK | Official NuGet `Anthropic` 13.13.0 (`client.Messages.Create`) |
-| Model | `claude-haiku-5-5`, `Effort = low` (chat ke liye sasta/tez). Thinking default on hai, alag se set nahi kiya |
-| Menu AI tak kaise | Poora restaurant data system prompt mein (RAG/tools Phase 3 mein). System prompt par `cache_control` (Haiku 5.5 par 512 token se upar cache hota hai) |
-| Waqt | Pakistan time (UTC+5) aakhri customer message ke saath note ki shakal mein, system prompt mein nahi (cache bachane ke liye) |
-| Memory | `ChatMessages` table se aakhri `HistoryLimit` (20) messages. Lagataar same role wale jod diye jaate hain, pehla message customer ka |
-| Refusal / API error | Fixed `FallbackReply` ("staff rabta karega"). Haiku par server-side fallback nahi hota |
-| Non-text (image/voice) | AI call ke baghair fixed jawab (paisa bachao) |
-| DB | PostgreSQL + EF Core 8 (Npgsql). Startup par `Migrate()` + demo seed "Talha's Karahi" (configured `PhoneNumberId` par) |
-| Connection | `ConnectionStrings:Default` ya `DATABASE_URL` (postgres:// URL bhi chalta hai) |
-| Switch | `Bot:UseAi=false` karne par Phase 1 wala hello reply |
+| Model | `claude-haiku-5-5`, `Effort = low` (cheap/fast for chat). Thinking is on by default; not set separately |
+| How the menu reaches the AI | All restaurant data is in the system prompt (RAG/tools in Phase 3). `cache_control` on the system prompt (Haiku 5.5 caches above 512 tokens) |
+| Time | Pakistan time (UTC+5) is added as a note to the last customer message, not to the system prompt (to keep the cache) |
+| Memory | The last `HistoryLimit` (20) messages from the `ChatMessages` table. Consecutive messages with the same role are merged; the first message is the customer's |
+| Refusal / API error | A fixed `FallbackReply` ("staff will contact you"). Haiku has no server-side fallback |
+| Non-text (image/voice) | A fixed reply without an AI call (saves money) |
+| DB | PostgreSQL + EF Core 8 (Npgsql). On startup: `Migrate()` + demo seed "Talha's Karahi" (for the configured `PhoneNumberId`) |
+| Connection | `ConnectionStrings:Default` or `DATABASE_URL` (a postgres:// URL also works) |
+| Switch | `Bot:UseAi=false` falls back to the Phase 1 hello reply |
 
-## Files (Phase 2 mein nayi)
-- `Data/Entities.cs`: Restaurant, MenuItem, Deal, Faq, Customer, ChatMessage (token usage bhi save)
+## Files (new in Phase 2)
+- `Data/Entities.cs`: Restaurant, MenuItem, Deal, Faq, Customer, ChatMessage (token usage is saved too)
 - `Data/AppDbContext.cs`, `Data/DemoSeeder.cs`, `Data/Migrations/*` (InitialCreate)
 - `Ai/AiOptions.cs`, `Ai/ChatCompletionClient.cs` (IChatCompletionClient + Claude implementation), `Ai/SystemPromptBuilder.cs`
-- `Messaging/ClaudeReplyGenerator.cs`: restaurant dhoondo → customer upsert → message save → history → Claude → reply save
+- `Messaging/ClaudeReplyGenerator.cs`: find restaurant → upsert customer → save message → history → Claude → save reply
 - `Infrastructure/DatabaseUrl.cs`
 
 ## Checklist
@@ -28,21 +28,21 @@
 - [x] Entities + DbContext + migration
 - [x] Claude client + system prompt + memory + reply generator
 - [x] Program.cs wiring
-- [x] Tests: 25 pass (prompt builder, history, reply generator fake AI ke saath, keyed lock, webhook e2e in-memory DB)
-- [x] Local Postgres 16 par end-to-end run: migration + seed + 2 messages, memory sahi gayi, `cache_control` + `effort: low` request mein, tokens DB mein (asli Claude ki jagah nakli server, API key nahi thi)
-- [x] Per-customer lock (`KeyedLock`): ek customer ke messages ek ke baad ek
+- [x] Tests: 25 passing (prompt builder, history, reply generator with a fake AI, keyed lock, webhook e2e with an in-memory DB)
+- [x] End-to-end run on local Postgres 16: migration + seed + 2 messages, memory passed correctly, `cache_control` + `effort: low` in the request, tokens saved in the DB (a fake server stood in for Claude; there was no API key)
+- [x] Per-customer lock (`KeyedLock`): one customer's messages are processed one at a time
 - [x] README update (Anthropic key, Postgres setup)
-- [ ] **Asli Claude key ke saath test** (Talha ki key aane par): Roman Urdu jawab, prices sahi, cache hit (`CacheReadTokens` > 0 doosre message se)
-- [ ] Code `D:\Development\New folder` mein copy (folder share hone ke baad)
+- [ ] **Test with a real Claude key** (once Talha's key is available): replies in the customer's language, correct prices, cache hit (`CacheReadTokens` > 0 from the second message)
+- [ ] Copy the code to `D:\Development\New folder` (after the folder is shared)
 
-## Settings jo Talha ko set karni hain
+## Settings Talha needs to set
 ```
 dotnet user-secrets set "Anthropic:ApiKey" "sk-ant-..."
 dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Database=chatserve;Username=postgres;Password=..."
 ```
 
-## Phase 3 ke liye notes (agla qadam)
-- Tools: `GetMenu`, `CheckDeliveryArea`, `PlaceOrder` (confirm ke baad), `GetOrderStatus`, `BookTable`, `HandoverToHuman`
+## Notes for Phase 3 (next step)
+- Tools: `GetMenu`, `CheckDeliveryArea`, `PlaceOrder` (after confirm), `GetOrderStatus`, `BookTable`, `HandoverToHuman`
 - `Orders`, `OrderItems`, `TableBookings` tables + migration
-- Tool loop: Haiku 5.5 par forced `tool_choice` nahi hota, `auto` + `strict: true` use karna
-- System prompt ki "Online order placement is not live yet" wali line Phase 3 mein badalni hai
+- Tool loop: Haiku 5.5 doesn't support forced `tool_choice`; use `auto` + `strict: true`
+- The "Online order placement is not live yet" line in the system prompt must change in Phase 3

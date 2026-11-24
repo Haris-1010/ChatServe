@@ -1,29 +1,29 @@
 namespace ChatServe.Api.Data;
 
-// Multi-tenant: har table mein RestaurantId. Restaurant webhook ke phone_number_id se pehchana jata hai.
+// Multi-tenant: every table has a RestaurantId. The restaurant is identified by the webhook's phone_number_id.
 
 public sealed class Restaurant
 {
     public int Id { get; set; }
     public required string Name { get; set; }
 
-    /// <summary>Meta ka Phone number ID (number nahi). Webhook isi se restaurant dhoondta hai.</summary>
+    /// <summary>Meta's Phone number ID (not the phone number). The webhook uses it to find the restaurant.</summary>
     public required string WhatsAppPhoneNumberId { get; set; }
 
     public bool IsBotEnabled { get; set; } = true;
 
-    /// <summary>Bot ka lehja, maslan "dostana, mukhtasar, Lahori andaaz".</summary>
+    /// <summary>The bot's tone, e.g. "friendly, brief, Lahori style".</summary>
     public string? BotTone { get; set; }
 
     public string? Address { get; set; }
-    public string? Timings { get; set; }              // "Rozana 12 PM se 2 AM"
-    public string? DeliveryAreas { get; set; }        // delivery ke mazeed notes (areas aur charges ab DeliveryZones table mein)
+    public string? Timings { get; set; }              // "Daily 12 PM to 2 AM"
+    public string? DeliveryAreas { get; set; }        // extra delivery notes (areas and charges are in the DeliveryZones table)
     public decimal? MinimumOrder { get; set; }
     public string? PaymentMethods { get; set; }       // "Cash on delivery, JazzCash, Easypaisa"
-    public string? ExtraInfo { get; set; }            // koi bhi aur baat jo bot ko pata honi chahiye
+    public string? ExtraInfo { get; set; }            // anything else the bot should know
     public string Currency { get; set; } = "Rs";
 
-    /// <summary>Kitchen/staff ka WhatsApp number (country code ke saath, maslan 923001234567). Confirmed orders, bookings aur handover yahan jaate hain.</summary>
+    /// <summary>Kitchen/staff WhatsApp number (with country code, e.g. 923001234567). Confirmed orders, bookings and handovers are sent here.</summary>
     public string? StaffWhatsAppNumber { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -34,7 +34,7 @@ public sealed class Restaurant
     public List<DeliveryZone> DeliveryZones { get; set; } = [];
 }
 
-/// <summary>Delivery area aur us ka charge. AI sirf inhi areas mein order le sakta hai (tool schema mein enum).</summary>
+/// <summary>A delivery area and its charge. The AI can only take orders for these areas (an enum in the tool schema).</summary>
 public sealed class DeliveryZone
 {
     public int Id { get; set; }
@@ -83,7 +83,7 @@ public sealed class Customer
     public DateTimeOffset FirstSeenAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset LastMessageAt { get; set; } = DateTimeOffset.UtcNow;
 
-    /// <summary>Human handover: is waqt tak bot is customer ko jawab nahi dega (staff baat karega).</summary>
+    /// <summary>Human handover: the bot won't reply to this customer until this time (staff will talk).</summary>
     public DateTimeOffset? BotPausedUntil { get; set; }
     // Phase 4: Label, TotalOrders, NoShowCount, IsBlacklisted
 }
@@ -100,7 +100,7 @@ public sealed class ChatMessage
     public string? WhatsAppMessageId { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-    // Kharcha track karne ke liye (sirf bot messages par)
+    // For tracking cost (bot messages only)
     public int? InputTokens { get; set; }
     public int? OutputTokens { get; set; }
     public int? CacheReadTokens { get; set; }
@@ -110,7 +110,7 @@ public enum OrderType { Delivery = 0, Takeaway = 1, DineIn = 2 }
 
 public enum OrderStatus
 {
-    /// <summary>AI ne draft banaya, customer ka "confirm" baqi. Kitchen tak NAHI gaya.</summary>
+    /// <summary>The AI created a draft; waiting for the customer's "confirm". NOT sent to the kitchen.</summary>
     PendingConfirmation = 0,
     Confirmed = 1,
     Preparing = 2,
@@ -121,7 +121,7 @@ public enum OrderStatus
 
 public sealed class Order
 {
-    public int Id { get; set; }                         // customer ko yahi order number dikhta hai
+    public int Id { get; set; }                         // this is the order number the customer sees
     public int RestaurantId { get; set; }
     public int CustomerId { get; set; }
     public OrderStatus Status { get; set; }
@@ -133,7 +133,7 @@ public sealed class Order
     public string? PaymentMethod { get; set; }
     public string? Notes { get; set; }
 
-    // Server ne menu ki prices se hisaab lagaya (AI ka hisaab kabhi use nahi hota)
+    // Calculated by the server from menu prices (the AI's math is never used)
     public decimal Subtotal { get; set; }
     public decimal DeliveryCharge { get; set; }
     public decimal Total { get; set; }
@@ -142,7 +142,7 @@ public sealed class Order
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? ConfirmedAt { get; set; }
 
-    /// <summary>Wo bot message jis mein ye summary bheji gayi. "1" sirf usi ke foran baad confirm maana jata hai.</summary>
+    /// <summary>The bot message that carried this summary. "1" only counts as confirm right after it.</summary>
     public long? SummaryChatMessageId { get; set; }
 
     public List<OrderItem> Items { get; set; } = [];
@@ -154,7 +154,7 @@ public sealed class OrderItem
     public int OrderId { get; set; }
     public int? MenuItemId { get; set; }
     public int? DealId { get; set; }
-    public required string Name { get; set; }           // order ke waqt ka naam aur price (menu baad mein badle to bhi record sahi rahe)
+    public required string Name { get; set; }           // name and price at order time (the record stays correct if the menu changes later)
     public decimal UnitPrice { get; set; }
     public int Quantity { get; set; }
     public decimal LineTotal { get; set; }
@@ -170,7 +170,7 @@ public sealed class TableBooking
     public int CustomerId { get; set; }
     public required string CustomerName { get; set; }
     public required string Phone { get; set; }
-    public DateTimeOffset BookingTime { get; set; }     // Pakistan time offset ke saath
+    public DateTimeOffset BookingTime { get; set; }     // with the Pakistan time offset
     public int People { get; set; }
     public string? Notes { get; set; }
     public BookingStatus Status { get; set; }
@@ -178,8 +178,8 @@ public sealed class TableBooking
 }
 
 /// <summary>
-/// Dashboard se badli gayi settings (key = "WhatsApp:AccessToken" jaisi). App configuration mein sab se aakhir mein load hoti hain,
-/// is liye appsettings/env vars par tarjeeh rakhti hain. Restaurant se mutalliq nahi (poori app ki settings).
+/// Settings changed from the dashboard (keys like "WhatsApp:AccessToken"). Loaded last into the app configuration,
+/// so they take priority over appsettings/env vars. Not per restaurant (app-wide settings).
 /// </summary>
 public sealed class AppSetting
 {

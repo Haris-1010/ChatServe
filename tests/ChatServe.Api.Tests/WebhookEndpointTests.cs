@@ -58,7 +58,7 @@ public class WebhookEndpointTests : IClassFixture<WebhookEndpointTests.Factory>
                 s.AddSingleton<IWhatsAppClient>(WhatsApp);
                 s.RemoveAll<IChatCompletionClient>();
                 s.AddSingleton<IChatCompletionClient>(Ai);
-                // Postgres ki jagah in-memory DB
+                // in-memory DB instead of Postgres
                 s.RemoveAll<DbContextOptions<AppDbContext>>();
                 s.RemoveAll<AppDbContext>();
                 s.AddDbContext<AppDbContext>(o => o.UseInMemoryDatabase(_dbName));
@@ -111,7 +111,7 @@ public class WebhookEndpointTests : IClassFixture<WebhookEndpointTests.Factory>
             Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         }
 
-        // Background worker ka intezar
+        // wait for the background worker
         for (var i = 0; i < 50 && !_factory.WhatsApp.Sent.Any(s => s.Body.Contains("Assalam o alaikum")); i++)
             await Task.Delay(100);
         await Task.Delay(300);

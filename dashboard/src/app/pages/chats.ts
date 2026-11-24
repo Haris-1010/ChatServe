@@ -11,7 +11,7 @@ import { errorText, Toasts } from '../core/toast';
     <div class="page-head"><h1>Chats</h1></div>
     <div class="chat-layout card flush" [class.has-selection]="selected()">
       <aside class="conv-list">
-        <input class="search" placeholder="Naam ya number dhoondein…" [(ngModel)]="search" />
+        <input class="search" placeholder="Search name or number…" [(ngModel)]="search" />
         @for (c of filtered(); track c.id) {
           <button class="conv" [class.active]="selected()?.id === c.id" (click)="open(c)">
             <div class="conv-top">
@@ -25,7 +25,7 @@ import { errorText, Toasts } from '../core/toast';
             </div>
           </button>
         } @empty {
-          <p class="muted pad">Abhi koi chat nahi.</p>
+          <p class="muted pad">No chats yet.</p>
         }
       </aside>
 
@@ -36,14 +36,14 @@ import { errorText, Toasts } from '../core/toast';
             <div>
               <b>{{ c.name || 'Customer' }}</b><span class="phone-no">+{{ c.phone }}</span>
               <div class="small" [class.warn-text]="isPaused(c)">
-                {{ isPaused(c) ? 'Bot paused (staff baat kar raha hai) ' + when(c.botPausedUntil) + ' tak' : 'Bot jawab de raha hai' }}
+                {{ isPaused(c) ? 'Bot paused (staff is replying) until ' + when(c.botPausedUntil) : 'Bot is replying' }}
               </div>
             </div>
             <div class="spacer"></div>
             @if (isPaused(c)) {
-              <button class="btn sm" (click)="resume(c)">▶ Bot wapas ON</button>
+              <button class="btn sm" (click)="resume(c)">▶ Turn bot back on</button>
             } @else {
-              <button class="btn sm" (click)="pause(c)">⏸ Bot rokein (main baat karunga)</button>
+              <button class="btn sm" (click)="pause(c)">⏸ Pause bot (I'll reply)</button>
             }
           </header>
 
@@ -60,16 +60,16 @@ import { errorText, Toasts } from '../core/toast';
           </div>
 
           <form class="composer" (ngSubmit)="send(c)">
-            <textarea name="reply" rows="2" [(ngModel)]="reply" placeholder="Staff ki taraf se jawab likhein…"
+            <textarea name="reply" rows="2" [(ngModel)]="reply" placeholder="Write a reply as staff…"
               (keydown.enter)="$event.preventDefault(); send(c)"></textarea>
             <div class="composer-side">
-              <label class="check small"><input type="checkbox" name="pause" [(ngModel)]="pauseOnSend" /> Bot rok dein</label>
-              <button class="btn primary" [disabled]="sending() || !reply.trim()">Bhejein</button>
+              <label class="check small"><input type="checkbox" name="pause" [(ngModel)]="pauseOnSend" /> Pause bot</label>
+              <button class="btn primary" [disabled]="sending() || !reply.trim()">Send</button>
             </div>
           </form>
-          @if (c.isSimulated) { <p class="muted small pad">Ye simulator wali test chat hai: staff ka message sirf yahan save hota hai, WhatsApp par nahi jata.</p> }
+          @if (c.isSimulated) { <p class="muted small pad">This is a simulator test chat: staff messages are only saved here and are not sent on WhatsApp.</p> }
         } @else {
-          <div class="empty-thread muted">Baayen taraf se koi chat chunein</div>
+          <div class="empty-thread muted">Select a chat on the left</div>
         }
       </section>
     </div>
@@ -143,12 +143,12 @@ export class ChatsPage {
   }
 
   async pause(c: Conversation) {
-    try { await this.api.pauseBot(this.rid(), c.id); this.toasts.ok('Bot is chat par ruk gaya'); await this.load(this.rid()); }
+    try { await this.api.pauseBot(this.rid(), c.id); this.toasts.ok('Bot paused for this chat'); await this.load(this.rid()); }
     catch (e) { this.toasts.error(errorText(e)); }
   }
 
   async resume(c: Conversation) {
-    try { await this.api.resumeBot(this.rid(), c.id); this.toasts.ok('Bot wapas ON'); await this.load(this.rid()); }
+    try { await this.api.resumeBot(this.rid(), c.id); this.toasts.ok('Bot turned back on'); await this.load(this.rid()); }
     catch (e) { this.toasts.error(errorText(e)); }
   }
 }

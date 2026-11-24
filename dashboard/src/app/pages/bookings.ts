@@ -10,15 +10,15 @@ import { errorText, Toasts } from '../core/toast';
   template: `
     <div class="page-head">
       <h1>Table bookings</h1>
-      <label class="check"><input type="checkbox" [(ngModel)]="notify" /> Customer ko WhatsApp par batayen</label>
+      <label class="check"><input type="checkbox" [(ngModel)]="notify" /> Notify customer on WhatsApp</label>
     </div>
     <div class="tabs">
-      <button [class.active]="upcoming()" (click)="setUpcoming(true)">Aane wali</button>
-      <button [class.active]="!upcoming()" (click)="setUpcoming(false)">Sab</button>
+      <button [class.active]="upcoming()" (click)="setUpcoming(true)">Upcoming</button>
+      <button [class.active]="!upcoming()" (click)="setUpcoming(false)">All</button>
     </div>
     <section class="card flush">
       <table class="table">
-        <thead><tr><th>Waqt</th><th>Naam</th><th>Afraad</th><th class="hide-sm">Note</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Time</th><th>Name</th><th>People</th><th class="hide-sm">Note</th><th>Status</th><th></th></tr></thead>
         <tbody>
           @for (b of bookings(); track b.id) {
             <tr [class.dim]="b.status === 'Cancelled'">
@@ -32,7 +32,7 @@ import { errorText, Toasts } from '../core/toast';
                 @if (b.status !== 'Cancelled') { <button class="btn danger-ghost sm" (click)="set(b, 'Cancelled')">Cancel</button> }
               </td>
             </tr>
-          } @empty { <tr><td colspan="6" class="muted">Koi booking nahi. Customer WhatsApp par booking maange to bot yahan daal deta hai.</td></tr> }
+          } @empty { <tr><td colspan="6" class="muted">No bookings. When a customer asks for a table on WhatsApp, the bot adds it here.</td></tr> }
         </tbody>
       </table>
     </section>
@@ -44,7 +44,7 @@ export class BookingsPage {
   bookings = signal<Booking[]>([]);
   upcoming = signal(true);
   notify = true;
-  label: Record<BookingStatus, string> = { Requested: 'Nayi request', Confirmed: 'Confirmed', Cancelled: 'Cancelled' };
+  label: Record<BookingStatus, string> = { Requested: 'New request', Confirmed: 'Confirmed', Cancelled: 'Cancelled' };
   private current = onRestaurant(rid => this.load(rid), 30);
   private rid = computed(() => this.current.id()!);
 
@@ -61,7 +61,7 @@ export class BookingsPage {
   async set(b: Booking, status: BookingStatus) {
     try {
       const res = await this.api.setBookingStatus(this.rid(), b.id, status, this.notify);
-      if (res.notifyError) this.toasts.error('Status badal gaya, magar message nahi gaya: ' + res.notifyError);
+      if (res.notifyError) this.toasts.error('Status updated, but the message failed: ' + res.notifyError);
       else this.toasts.ok('Booking ' + this.label[status]);
       await this.load(this.rid());
     } catch (e) {

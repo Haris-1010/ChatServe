@@ -11,13 +11,13 @@ import { errorText, Toasts } from '../core/toast';
     <div class="page-head">
       <h1>Customers</h1>
       <div class="row">
-        <input class="search inline" placeholder="Naam ya number…" [(ngModel)]="search" (keyup.enter)="load(rid())" />
+        <input class="search inline" placeholder="Name or number…" [(ngModel)]="search" (keyup.enter)="load(rid())" />
         <button class="btn ghost" (click)="exportCsv()">⬇ CSV (Excel)</button>
       </div>
     </div>
     <section class="card flush">
       <table class="table">
-        <thead><tr><th>Customer</th><th class="num">Orders</th><th class="num">Kharcha</th><th class="hide-sm">Messages</th><th>Aakhri message</th><th>Bot</th></tr></thead>
+        <thead><tr><th>Customer</th><th class="num">Orders</th><th class="num">Spent</th><th class="hide-sm">Messages</th><th>Last message</th><th>Bot</th></tr></thead>
         <tbody>
           @for (c of customers(); track c.id) {
             <tr>
@@ -28,17 +28,17 @@ import { errorText, Toasts } from '../core/toast';
               <td class="muted">{{ when(c.lastMessageAt) }}</td>
               <td>
                 @if (paused(c)) {
-                  <button class="btn sm" (click)="resume(c)" title="Bot paused hai">▶ ON karein</button>
+                  <button class="btn sm" (click)="resume(c)" title="Bot is paused">▶ Turn on</button>
                 } @else {
-                  <button class="btn ghost sm" (click)="pause(c)">⏸ Rokein</button>
+                  <button class="btn ghost sm" (click)="pause(c)">⏸ Pause</button>
                 }
               </td>
             </tr>
-          } @empty { <tr><td colspan="6" class="muted">Koi customer nahi.</td></tr> }
+          } @empty { <tr><td colspan="6" class="muted">No customers yet.</td></tr> }
         </tbody>
       </table>
     </section>
-    <p class="muted small">Customer labels (Ordered / Interested / Fake), no-shows aur blacklist Phase 4 mein aayenge.</p>
+    <p class="muted small">Customer labels (Ordered / Interested / Fake), no-shows and a blacklist are coming in Phase 4.</p>
   `,
 })
 export class CustomersPage {
@@ -58,12 +58,12 @@ export class CustomersPage {
   }
 
   async pause(c: Customer) {
-    try { await this.api.pauseBot(this.rid(), c.id); this.toasts.ok('Bot ruk gaya'); await this.load(this.rid()); }
+    try { await this.api.pauseBot(this.rid(), c.id); this.toasts.ok('Bot paused'); await this.load(this.rid()); }
     catch (e) { this.toasts.error(errorText(e)); }
   }
 
   async resume(c: Customer) {
-    try { await this.api.resumeBot(this.rid(), c.id); this.toasts.ok('Bot wapas ON'); await this.load(this.rid()); }
+    try { await this.api.resumeBot(this.rid(), c.id); this.toasts.ok('Bot turned back on'); await this.load(this.rid()); }
     catch (e) { this.toasts.error(errorText(e)); }
   }
 

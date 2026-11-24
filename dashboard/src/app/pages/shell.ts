@@ -25,13 +25,13 @@ import { errorText, Toasts } from '../core/toast';
         }
 
         <nav (click)="navOpen.set(false)">
-          <div class="nav-label">Roz ka kaam</div>
+          <div class="nav-label">Daily work</div>
           <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"><span>📊</span> Overview</a>
           <a routerLink="/orders" routerLinkActive="active"><span>🧾</span> Orders</a>
           <a routerLink="/chats" routerLinkActive="active"><span>💬</span> Chats</a>
           <a routerLink="/bookings" routerLinkActive="active"><span>📅</span> Table bookings</a>
           <a routerLink="/customers" routerLinkActive="active"><span>👥</span> Customers</a>
-          <div class="nav-label">Bot ki training</div>
+          <div class="nav-label">Bot training</div>
           <a routerLink="/menu" routerLinkActive="active"><span>🍛</span> Menu, deals, FAQs</a>
           <a routerLink="/restaurant" routerLinkActive="active"><span>🏪</span> Restaurant info</a>
           <a routerLink="/simulator" routerLinkActive="active"><span>🧪</span> Bot test (simulator)</a>
@@ -54,8 +54,8 @@ import { errorText, Toasts } from '../core/toast';
           @if (loaded()) {
             @if (restaurants.list().length === 0) {
               <div class="card empty">
-                <h2>Abhi koi restaurant nahi</h2>
-                <p class="muted">Settings mein WhatsApp <b>Phone number ID</b> daal kar app restart karein (demo restaurant khud ban jayega), ya <a routerLink="/restaurant">Restaurant info</a> par naya restaurant banayein.</p>
+                <h2>No restaurant yet</h2>
+                <p class="muted">Add your WhatsApp <b>Phone number ID</b> in Settings and restart the app (a demo restaurant is created automatically), or create a new restaurant on the <a routerLink="/restaurant">Restaurant info</a> page.</p>
               </div>
             }
             <router-outlet />

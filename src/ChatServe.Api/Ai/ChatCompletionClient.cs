@@ -10,10 +10,10 @@ public sealed record ChatTurn(bool FromCustomer, string Text);
 public sealed record AiResult(
     string? Text, bool Refused, long InputTokens, long OutputTokens, long CacheReadTokens, int ToolCalls = 0);
 
-/// <summary>Tool ki definition. <see cref="JsonSchema"/> poora JSON schema hai (type, properties, required, additionalProperties).</summary>
+/// <summary>A tool definition. <see cref="JsonSchema"/> is the full JSON schema (type, properties, required, additionalProperties).</summary>
 public sealed record AiTool(string Name, string Description, string JsonSchema);
 
-/// <summary>Tool chalane ka nateeja. IsError par AI ko pata chalta hai ke kuch ghalat tha (maslan item code ghalat).</summary>
+/// <summary>The result of running a tool. IsError tells the AI something went wrong (e.g. a wrong item code).</summary>
 public sealed record ToolOutcome(string Content, bool IsError = false);
 
 public interface IToolExecutor
@@ -21,7 +21,7 @@ public interface IToolExecutor
     Task<ToolOutcome> ExecuteAsync(string name, IReadOnlyDictionary<string, JsonElement> input, CancellationToken ct);
 }
 
-/// <summary>AI model ka abstraction, taake tests mein asli API call na ho.</summary>
+/// <summary>Abstraction over the AI model, so tests don't make real API calls.</summary>
 public interface IChatCompletionClient
 {
     Task<AiResult> CompleteAsync(
@@ -33,8 +33,8 @@ public interface IChatCompletionClient
 }
 
 /// <summary>
-/// API key dashboard se badal sakti hai, is liye client key ke hisaab se banta hai (har request par naya nahi:
-/// key wahi rahe to wahi client).
+/// The API key can change from the dashboard, so the client is built per key (not per request:
+/// same key, same client).
 /// </summary>
 public sealed class AnthropicClientProvider(IOptionsMonitor<AiOptions> options)
 {
@@ -52,7 +52,7 @@ public sealed class AnthropicClientProvider(IOptionsMonitor<AiOptions> options)
         {
             if (_current is { } c && c.Key == key)
                 return c.Client;
-            // Key khali ho to SDK khud ANTHROPIC_API_KEY env var parhta hai.
+            // If the key is empty, the SDK reads the ANTHROPIC_API_KEY env var itself.
             var client = key is null ? new AnthropicClient() : new AnthropicClient { ApiKey = key };
             _current = (key, client);
             return client;
@@ -60,7 +60,7 @@ public sealed class AnthropicClientProvider(IOptionsMonitor<AiOptions> options)
     }
 }
 
-/// <summary>Claude Messages API (official Anthropic C# SDK), manual tool loop ke saath.</summary>
+/// <summary>Claude Messages API (official Anthropic C# SDK) with a manual tool loop.</summary>
 public sealed class ClaudeChatCompletionClient(
     AnthropicClientProvider clients,
     IOptionsMonitor<AiOptions> options,
@@ -84,7 +84,7 @@ public sealed class ClaudeChatCompletionClient(
                 : new AssistantMessageParam { Content = turn.Text });
         }
 
-        // Haiku 5.5 par forced tool_choice nahi hota: default "auto" + strict schema.
+        // Haiku 5.5 doesn't support forced tool_choice: default "auto" + strict schema.
         List<ToolUnion>? toolDefs = tools.Count == 0 || executor is null ? null : tools.Select(ToSdkTool).ToList();
 
         long input = 0, output = 0, cacheRead = 0;
@@ -97,8 +97,8 @@ public sealed class ClaudeChatCompletionClient(
             {
                 Model = opts.Model,
                 MaxTokens = opts.MaxTokens,
-                // Tools + restaurant ka data + rules har request mein same hain. Is breakpoint se
-                // tools aur system dono cache hote hain: input ka kharcha ~90% kam.
+                // Tools + restaurant data + rules are the same on every request. This breakpoint
+                // caches both tools and system: input cost drops ~90%.
                 System = new List<TextBlockParam>
                 {
                     new() { Text = systemPrompt, CacheControl = new CacheControlEphemeral() },
@@ -113,7 +113,7 @@ public sealed class ClaudeChatCompletionClient(
             cacheRead += response.Usage.CacheReadInputTokens ?? 0;
 
             if (response.StopReason == "refusal")
-                return new AiResult(null, true, input, output, cacheRead, toolCalls); // Haiku par server-side fallback nahi
+                return new AiResult(null, true, input, output, cacheRead, toolCalls); // no server-side fallback on Haiku
 
             var text = string.Join("\n", response.Content.Select(b => b.Value).OfType<TextBlock>().Select(t => t.Text)).Trim();
 
@@ -126,7 +126,7 @@ public sealed class ClaudeChatCompletionClient(
                 return new AiResult(null, false, input, output, cacheRead, toolCalls);
             }
 
-            // Assistant ka poora jawab (thinking + tool_use) wapas bhejna zaroori hai, phir saare tool results ek user message mein.
+            // The full assistant reply (thinking + tool_use) must be sent back, then all tool results in one user message.
             var assistantContent = new List<ContentBlockParam>();
             var results = new List<ContentBlockParam>();
             foreach (var block in response.Content)
@@ -178,7 +178,7 @@ public sealed class ClaudeChatCompletionClient(
             Name = tool.Name,
             Description = tool.Description,
             InputSchema = InputSchema.FromRawUnchecked(schema),
-            Strict = true, // input hamesha schema ke mutabiq aata hai
+            Strict = true, // input always matches the schema
         };
     }
 

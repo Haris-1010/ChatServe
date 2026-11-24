@@ -5,8 +5,8 @@ using Microsoft.Extensions.Options;
 namespace ChatServe.Api.Data;
 
 /// <summary>
-/// Demo restaurant "Talha's Karahi" banata hai (agar pehle se na ho), configured PhoneNumberId ke saath.
-/// Isi par restaurants ko demo dikhana hai. Dashboard (Phase 5) aane tak menu yahin se aata hai.
+/// Creates the demo restaurant "Talha's Karahi" (if it doesn't exist) for the configured PhoneNumberId.
+/// Used for demos to restaurants. Until the dashboard (Phase 5), the menu came from here.
 /// </summary>
 public static class DemoSeeder
 {
@@ -21,7 +21,7 @@ public static class DemoSeeder
             .FirstOrDefaultAsync(r => r.WhatsAppPhoneNumberId == phoneNumberId, ct);
         if (existing is not null)
         {
-            // Phase 2 mein bana demo restaurant: Phase 3 wali cheezein (zones, staff number) add kar do.
+            // Demo restaurant created in Phase 2: add the Phase 3 parts (zones, staff number).
             if (existing.DeliveryZones.Count == 0)
             {
                 existing.DeliveryZones.AddRange(DemoZones());
@@ -37,26 +37,26 @@ public static class DemoSeeder
         {
             Name = "Talha's Karahi",
             WhatsAppPhoneNumberId = phoneNumberId,
-            BotTone = "Dostana, izzat se, mukhtasar. Lahori mehmaan nawazi wala andaaz.",
+            BotTone = "Friendly, polite and brief, with warm Lahori hospitality.",
             Address = "Main Boulevard, Johar Town, Lahore",
-            Timings = "Rozana dopehar 12 baje se raat 2 baje tak. Jumma ko 2 baje se.",
+            Timings = "Daily from 12 PM to 2 AM. Fridays from 2 PM.",
             DeliveryAreas = DemoDeliveryNotes,
             DeliveryZones = DemoZones(),
             StaffWhatsAppNumber = string.IsNullOrWhiteSpace(staffWhatsAppNumber) ? null : staffWhatsAppNumber,
             MinimumOrder = 1000,
             PaymentMethods = "Cash on delivery, JazzCash, Easypaisa, bank transfer",
-            ExtraInfo = "Dine-in aur takeaway dono available hain. Family hall maujood hai.",
+            ExtraInfo = "Both dine-in and takeaway are available. We have a family hall.",
         };
 
         var sort = 0;
         void Add(string cat, string name, decimal price, string? desc = null, bool available = true) =>
             r.MenuItems.Add(new MenuItem { Category = cat, Name = name, Price = price, Description = desc, IsAvailable = available, SortOrder = sort++ });
 
-        Add("Karahi", "Chicken Karahi (Half)", 1400, "Desi ghee, tamatar wali");
-        Add("Karahi", "Chicken Karahi (Full)", 2600, "Desi ghee, tamatar wali");
+        Add("Karahi", "Chicken Karahi (Half)", 1400, "Desi ghee, tomato based");
+        Add("Karahi", "Chicken Karahi (Full)", 2600, "Desi ghee, tomato based");
         Add("Karahi", "Mutton Karahi (Half)", 2800);
         Add("Karahi", "Mutton Karahi (Full)", 5400);
-        Add("Karahi", "Chicken White Karahi (Full)", 2900, "Dahi aur cream wali");
+        Add("Karahi", "Chicken White Karahi (Full)", 2900, "With yogurt and cream");
         Add("BBQ", "Chicken Tikka (Leg/Chest)", 450);
         Add("BBQ", "Seekh Kabab (4 pcs)", 700);
         Add("BBQ", "Chicken Malai Boti (10 pcs)", 950);
@@ -73,16 +73,16 @@ public static class DemoSeeder
         r.Deals.Add(new Deal { Name = "Family Deal", Details = "Chicken Karahi Full + 4 Naan + Raita + 1.5L Drink", Price = 3300 });
         r.Deals.Add(new Deal { Name = "BBQ Platter", Details = "2 Tikka + 4 Seekh Kabab + 10 Malai Boti + 4 Naan", Price = 2900 });
 
-        r.Faqs.Add(new Faq { Question = "Kya khana halal hai?", Answer = "Ji, saara gosht 100% halal hai." });
-        r.Faqs.Add(new Faq { Question = "Table booking hoti hai?", Answer = "Ji, WhatsApp par naam, waqt aur afraad ki tadaad bata dein." });
-        r.Faqs.Add(new Faq { Question = "Spicy kam ho sakta hai?", Answer = "Ji, order ke waqt bata dein, mirch kam ya zyada kar denge." });
+        r.Faqs.Add(new Faq { Question = "Is the food halal?", Answer = "Yes, all our meat is 100% halal." });
+        r.Faqs.Add(new Faq { Question = "Do you take table bookings?", Answer = "Yes, just send your name, time and number of people on WhatsApp." });
+        r.Faqs.Add(new Faq { Question = "Can you make it less spicy?", Answer = "Yes, tell us when ordering and we'll adjust the spice level." });
 
         db.Restaurants.Add(r);
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Seeded demo restaurant {Name} for phone number id {Id}", r.Name, phoneNumberId);
     }
 
-    private const string DemoDeliveryNotes = "Delivery mein aam tor par 40 se 50 minute lagte hain.";
+    private const string DemoDeliveryNotes = "Delivery usually takes 40 to 50 minutes.";
 
     private static List<DeliveryZone> DemoZones() =>
     [

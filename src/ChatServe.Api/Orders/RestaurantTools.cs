@@ -5,10 +5,10 @@ using ChatServe.Api.Data;
 namespace ChatServe.Api.Orders;
 
 /// <summary>
-/// AI ke tools. Har restaurant ke liye definitions deterministic hain (delivery areas enum mein),
-/// taake prompt cache (tools + system) hit hota rahe.
-/// Menu ke liye alag GetMenu tool nahi: poora menu pehle se (cached) system prompt mein hai, extra round-trip ka kharcha bachta hai.
-/// Delivery area ka check place_order ke andar hai (enum + server validation).
+/// The AI's tools. Definitions are deterministic per restaurant (delivery areas in an enum),
+/// so the prompt cache (tools + system) keeps hitting.
+/// No separate GetMenu tool: the full menu is already in the (cached) system prompt, which saves an extra round trip.
+/// The delivery area check is inside place_order (enum + server validation).
 /// </summary>
 public static class RestaurantTools
 {
@@ -108,8 +108,8 @@ public static class RestaurantTools
 }
 
 /// <summary>
-/// Ek customer message ke liye tools chalata hai. Side effects (draft bana, staff ko kya bhejna hai, handover)
-/// yaad rakhta hai taake reply generator AI call ke baad un par amal kare.
+/// Runs tools for one customer message. Remembers side effects (draft created, what to send staff, handover)
+/// so the reply generator can act on them after the AI call.
 /// </summary>
 public sealed class OrderToolExecutor(
     OrderService orders, Restaurant restaurant, Customer customer, DateTimeOffset now) : IToolExecutor

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Caching.Memory;
 namespace ChatServe.Api.Messaging;
 
 /// <summary>
-/// Background worker: queue se message uthata hai, read mark karta hai, reply banata hai aur bhejta hai.
+/// Background worker: takes a message from the queue, marks it read, builds a reply and sends it.
 /// </summary>
 public sealed class MessageProcessingService(
     IMessageQueue queue,
@@ -12,14 +12,14 @@ public sealed class MessageProcessingService(
     IMemoryCache cache,
     ILogger<MessageProcessingService> logger) : BackgroundService
 {
-    // Ek waqt mein kitne messages parallel process hon. Phase 2 mein Claude call slow hogi, is liye >1.
+    // How many messages to process in parallel. Claude calls are slow (Phase 2), so >1.
     private const int MaxParallelism = 4;
 
-    // Meta kabhi kabhi same message dobara bhejta hai (retry). Is ke liye id yaad rakhte hain.
+    // Meta sometimes resends the same message (retry), so we remember ids.
     private static readonly TimeSpan DedupWindow = TimeSpan.FromHours(24);
 
-    // Ek customer ke messages ek ke baad ek (warna history/memory gadbad ho sakti hai).
-    // Mukhtalif customers parallel chalte hain.
+    // One customer's messages are processed one at a time (otherwise history/memory can get mixed up).
+    // Different customers run in parallel.
     private readonly KeyedLock _customerLock = new();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -41,7 +41,7 @@ public sealed class MessageProcessingService(
                 }
                 catch (Exception ex)
                 {
-                    // Ek message fail ho to worker band nahi hona chahiye.
+                    // One failed message must not stop the worker.
                     logger.LogError(ex, "Failed to process message {MessageId}", message.MessageId);
                 }
             });
@@ -64,7 +64,7 @@ public sealed class MessageProcessingService(
         var whatsApp = scope.ServiceProvider.GetRequiredService<IWhatsAppClient>();
         var replyGenerator = scope.ServiceProvider.GetRequiredService<IReplyGenerator>();
 
-        // Blue ticks + typing indicator. Ye fail ho jaye to bhi reply bhejna hai.
+        // Blue ticks + typing indicator. Send the reply even if this fails.
         try
         {
             await whatsApp.MarkAsReadAsync(message.PhoneNumberId, message.MessageId, showTyping: true, ct);

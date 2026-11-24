@@ -1,0 +1,19 @@
+# Render Blueprint: Render > New > Blueprint > pick this repo.
+# The database is on Neon (free, doesn't expire), so there is no Render database here.
+# Values marked "sync: false" are secrets: Render asks for them when you create the Blueprint.
+services:
+  - type: web
+    name: chatserve
+    runtime: docker
+    plan: free
+    region: singapore          # closest Render region to Pakistan; create the Neon project in AWS Singapore too
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true           # redeploy on every push to the branch
+    envVars:
+      - key: DATABASE_URL      # Neon connection string (postgresql://...?sslmode=require)
+        sync: false
+      - key: Dashboard__AdminPassword
+        sync: false
+      - key: Anthropic__ApiKey
+        sync: false

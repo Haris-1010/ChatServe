@@ -5,7 +5,7 @@ namespace ChatServe.Api.Messaging;
 public static class WebhookParser
 {
     /// <summary>
-    /// Payload se customer messages nikalta hai. Status updates (sent/delivered/read) ignore hote hain.
+    /// Extracts customer messages from the payload. Status updates (sent/delivered/read) are ignored.
     /// </summary>
     public static IReadOnlyList<IncomingMessage> ExtractMessages(WebhookPayload payload, string fallbackPhoneNumberId)
     {

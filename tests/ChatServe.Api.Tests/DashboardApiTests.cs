@@ -13,7 +13,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace ChatServe.Api.Tests;
 
-/// <summary>Dashboard ka admin API: login, settings (DB se, foran lagu), menu CRUD, simulator, orders.</summary>
+/// <summary>The dashboard admin API: login, settings (from the DB, applied immediately), menu CRUD, simulator, orders.</summary>
 public class DashboardApiTests
 {
     private const string Password = "test-pass";
@@ -68,7 +68,7 @@ public class DashboardApiTests
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/restaurants")).StatusCode);
         var wrong = await client.PostAsJsonAsync("/api/auth/login", new { password = "nope" });
         Assert.Equal(HttpStatusCode.Unauthorized, wrong.StatusCode);
-        // webhook login ke baghair hi chalta hai (Meta ke liye)
+        // the webhook works without login (for Meta)
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/webhook?hub.mode=subscribe&hub.verify_token=x&hub.challenge=1")).StatusCode);
     }
 
@@ -80,23 +80,23 @@ public class DashboardApiTests
 
         var settings = await c.GetFromJsonAsync<JsonElement>("/api/settings");
         var token = settings.GetProperty("settings").EnumerateArray().Single(s => s.GetProperty("key").GetString() == "WhatsApp:AccessToken");
-        Assert.Equal(JsonValueKind.Null, token.GetProperty("value").ValueKind); // secret kabhi wapas nahi aata
+        Assert.Equal(JsonValueKind.Null, token.GetProperty("value").ValueKind); // secrets are never returned
         Assert.Equal("••••1234", token.GetProperty("hint").GetString());
         Assert.DoesNotContain("secret-access-token", settings.GetRawText());
 
-        // Verify token dashboard se: webhook foran naya token qubool kare
+        // Verify token from the dashboard: the webhook accepts the new token immediately
         var save = await c.PutAsJsonAsync("/api/settings", new { values = new Dictionary<string, string?> { ["WhatsApp:VerifyToken"] = "from-dashboard" } });
         Assert.Equal(HttpStatusCode.NoContent, save.StatusCode);
         var verify = await c.GetAsync("/webhook?hub.mode=subscribe&hub.verify_token=from-dashboard&hub.challenge=42");
         Assert.Equal("42", await verify.Content.ReadAsStringAsync());
 
-        // Ghalat setting / ghalat value
+        // Unknown setting / invalid value
         var unknown = await c.PutAsJsonAsync("/api/settings", new { values = new Dictionary<string, string?> { ["ConnectionStrings:Default"] = "x" } });
         Assert.Equal(HttpStatusCode.BadRequest, unknown.StatusCode);
         var badNumber = await c.PutAsJsonAsync("/api/settings", new { values = new Dictionary<string, string?> { ["Anthropic:HistoryLimit"] = "abc" } });
         Assert.Equal(HttpStatusCode.BadRequest, badNumber.StatusCode);
 
-        // null = dashboard wali value hatao
+        // null = remove the dashboard value
         await c.PutAsJsonAsync("/api/settings", new { values = new Dictionary<string, string?> { ["WhatsApp:VerifyToken"] = null } });
         Assert.Equal(HttpStatusCode.Forbidden, (await c.GetAsync("/webhook?hub.mode=subscribe&hub.verify_token=from-dashboard&hub.challenge=1")).StatusCode);
     }
@@ -119,10 +119,10 @@ public class DashboardApiTests
         Assert.Contains("salam", hello.GetProperty("reply").GetString());
         Assert.False(hello.GetProperty("usedAi").GetBoolean());
 
-        // Simulator kabhi asli WhatsApp nahi bhejta
+        // The simulator never sends real WhatsApp
         Assert.Empty(factory.WhatsApp.Sent);
 
-        // Chat dashboard mein "Test" ke taur par
+        // The chat shows as "Test" in the dashboard
         var convs = await c.GetFromJsonAsync<JsonElement>($"/api/restaurants/{rid}/conversations");
         Assert.True(convs.EnumerateArray().Single(x => x.GetProperty("phone").GetString() == "000123").GetProperty("isSimulated").GetBoolean());
     }
@@ -153,22 +153,22 @@ public class DashboardApiTests
 
         var confirmed = await (await c.PostAsJsonAsync($"/api/restaurants/{rid}/simulator", new { phone = "000555", name = "Sara", text = "confirm" }))
             .Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Contains("confirm ho gaya", confirmed.GetProperty("reply").GetString());
+        Assert.Contains("is confirmed", confirmed.GetProperty("reply").GetString());
         Assert.Contains("NEW ORDER", confirmed.GetProperty("staffAlerts")[0].GetString());
-        Assert.Empty(factory.WhatsApp.Sent); // kitchen ticket simulator mein hi raha
+        Assert.Empty(factory.WhatsApp.Sent); // the kitchen ticket stayed in the simulator
 
         var active = await c.GetFromJsonAsync<JsonElement>($"/api/restaurants/{rid}/orders?status=active");
         var order = active.EnumerateArray().Single();
         Assert.Equal("Confirmed", order.GetProperty("status").GetString());
 
-        // Staff status badle: simulator customer ko WhatsApp nahi, sirf chat log
+        // Staff change the status: no WhatsApp for a simulator customer, only the chat log
         var id = order.GetProperty("id").GetInt32();
         var res = await c.PutAsJsonAsync($"/api/restaurants/{rid}/orders/{id}/status", new { status = "Preparing", notifyCustomer = true });
         res.EnsureSuccessStatusCode();
         Assert.Empty(factory.WhatsApp.Sent);
         var customerId = order.GetProperty("customerId").GetInt32();
         var msgs = await c.GetFromJsonAsync<JsonElement>($"/api/restaurants/{rid}/customers/{customerId}/messages");
-        Assert.Contains("tayyar ho raha", msgs.EnumerateArray().Last().GetProperty("text").GetString());
+        Assert.Contains("is being prepared", msgs.EnumerateArray().Last().GetProperty("text").GetString());
 
         var overview = await c.GetFromJsonAsync<JsonElement>($"/api/restaurants/{rid}/overview");
         Assert.Equal(1, overview.GetProperty("ordersToday").GetInt32());
@@ -225,7 +225,7 @@ public class DashboardApiTests
         Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/restaurants/{rid}/menu/{id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await c.DeleteAsync($"/api/restaurants/{rid}/menu/{id}")).StatusCode);
 
-        // Doosre restaurant ka item is restaurant ke URL se nahi badalta
+        // Another restaurant's item can't be changed through this restaurant's URL
         var other = await (await c.PostAsJsonAsync("/api/restaurants", new { name = "Other", whatsAppPhoneNumberId = "999" })).Content.ReadFromJsonAsync<JsonElement>();
         var firstItem = (await c.GetFromJsonAsync<JsonElement>($"/api/restaurants/{rid}/menu"))[0].GetProperty("id").GetInt32();
         var cross = await c.DeleteAsync($"/api/restaurants/{other.GetProperty("id").GetInt32()}/menu/{firstItem}");

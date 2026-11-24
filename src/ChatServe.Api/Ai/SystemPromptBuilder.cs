@@ -4,8 +4,8 @@ using ChatServe.Api.Data;
 namespace ChatServe.Api.Ai;
 
 /// <summary>
-/// Restaurant ke data se system prompt banata hai. Output deterministic hai (same data = same text),
-/// taake prompt cache hit ho. Waqt jaisi badalti cheezein yahan NAHI daalni.
+/// Builds the system prompt from restaurant data. The output is deterministic (same data = same text)
+/// so the prompt cache hits. Do NOT put changing things like the time here.
 /// </summary>
 public static class SystemPromptBuilder
 {
@@ -18,7 +18,7 @@ public static class SystemPromptBuilder
             You are the WhatsApp assistant of "{r.Name}", a restaurant in Pakistan. You reply to customers on the restaurant's WhatsApp number.
 
             # How to reply
-            - Reply in the customer's language and script: Roman Urdu, English, or Urdu. Most customers write Roman Urdu; mirror their style.
+            - Reply in English by default. If the customer writes in another language or script (for example Roman Urdu or Urdu), reply in that same language and style.
             - Tone: {(string.IsNullOrWhiteSpace(r.BotTone) ? "Friendly, respectful and brief." : r.BotTone)}
             - This is WhatsApp: keep replies short (usually 1 to 6 lines). No headings or tables. Use *bold* sparingly and simple "-" lists for menu items.
             - Each message costs the restaurant money, so answer completely in one message: when you mention a dish, include its price; when delivery comes up, include the charge and minimum order.

@@ -11,7 +11,7 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
   imports: [FormsModule],
   template: `
     <div class="page-head"><h1>Menu, deals, FAQs</h1></div>
-    <p class="muted">Bot sirf yahan likhi cheezon se jawab deta hai. Badlaav agle customer message se lagu ho jata hai.</p>
+    <p class="muted">The bot only answers from what is written here. Changes apply from the next customer message.</p>
 
     <div class="tabs">
       <button [class.active]="tab() === 'menu'" (click)="tab.set('menu')">🍛 Menu ({{ menu().length }})</button>
@@ -23,11 +23,11 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
     @switch (tab()) {
       @case ('menu') {
         <section class="card">
-          <h2>Nayi dish</h2>
+          <h2>New dish</h2>
           <form class="form-row" (ngSubmit)="add('menu', newItem)">
             <label class="field"><span>Category</span><input name="cat" [(ngModel)]="newItem.category" list="cats" placeholder="Karahi" /></label>
-            <label class="field grow"><span>Naam</span><input name="name" [(ngModel)]="newItem.name" placeholder="Chicken Karahi (Half)" /></label>
-            <label class="field grow"><span>Tafseel (optional)</span><input name="desc" [(ngModel)]="newItem.description" /></label>
+            <label class="field grow"><span>Name</span><input name="name" [(ngModel)]="newItem.name" placeholder="Chicken Karahi (Half)" /></label>
+            <label class="field grow"><span>Description (optional)</span><input name="desc" [(ngModel)]="newItem.description" /></label>
             <label class="field w-sm"><span>Price</span><input name="price" type="number" min="0" [(ngModel)]="newItem.price" /></label>
             <button class="btn primary">+ Add</button>
           </form>
@@ -38,7 +38,7 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
           <section class="card flush">
             <h2 class="pad">{{ cat }}</h2>
             <table class="table">
-              <thead><tr><th>Dish</th><th class="hide-sm">Tafseel</th><th class="num">Price</th><th>Available</th><th></th></tr></thead>
+              <thead><tr><th>Dish</th><th class="hide-sm">Description</th><th class="num">Price</th><th>Available</th><th></th></tr></thead>
               <tbody>
                 @for (m of byCategory(cat); track m.id) {
                   @if (editing() === 'menu-' + m.id) {
@@ -62,22 +62,22 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
               </tbody>
             </table>
           </section>
-        } @empty { <div class="card empty muted">Menu khali hai. Upar se pehli dish add karein.</div> }
+        } @empty { <div class="card empty muted">The menu is empty. Add your first dish above.</div> }
       }
 
       @case ('deals') {
         <section class="card">
-          <h2>Nayi deal</h2>
+          <h2>New deal</h2>
           <form class="form-row" (ngSubmit)="add('deals', newDeal)">
-            <label class="field"><span>Naam</span><input name="n" [(ngModel)]="newDeal.name" placeholder="Family Deal" /></label>
-            <label class="field grow"><span>Is mein kya hai</span><input name="d" [(ngModel)]="newDeal.details" placeholder="Karahi Full + 4 Naan + 1.5L Drink" /></label>
+            <label class="field"><span>Name</span><input name="n" [(ngModel)]="newDeal.name" placeholder="Family Deal" /></label>
+            <label class="field grow"><span>What's included</span><input name="d" [(ngModel)]="newDeal.details" placeholder="Karahi Full + 4 Naan + 1.5L Drink" /></label>
             <label class="field w-sm"><span>Price</span><input name="p" type="number" min="0" [(ngModel)]="newDeal.price" /></label>
             <button class="btn primary">+ Add</button>
           </form>
         </section>
         <section class="card flush">
           <table class="table">
-            <thead><tr><th>Deal</th><th>Tafseel</th><th class="num">Price</th><th>Active</th><th></th></tr></thead>
+            <thead><tr><th>Deal</th><th>Details</th><th class="num">Price</th><th>Active</th><th></th></tr></thead>
             <tbody>
               @for (d of deals(); track d.id) {
                 @if (editing() === 'deals-' + d.id) {
@@ -94,7 +94,7 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
                     <td class="actions"><button class="btn ghost sm" (click)="edit('deals', d)">Edit</button><button class="btn danger-ghost sm" (click)="del('deals', d.id, d.name)">🗑</button></td>
                   </tr>
                 }
-              } @empty { <tr><td colspan="5" class="muted">Koi deal nahi.</td></tr> }
+              } @empty { <tr><td colspan="5" class="muted">No deals yet.</td></tr> }
             </tbody>
           </table>
         </section>
@@ -102,18 +102,18 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
 
       @case ('faqs') {
         <section class="card">
-          <h2>Naya sawal/jawab</h2>
+          <h2>New question / answer</h2>
           <form class="form-col" (ngSubmit)="add('faqs', newFaq)">
-            <label class="field"><span>Sawal</span><input name="q" [(ngModel)]="newFaq.question" placeholder="Kya khana halal hai?" /></label>
-            <label class="field"><span>Jawab</span><textarea name="a" rows="2" [(ngModel)]="newFaq.answer"></textarea></label>
+            <label class="field"><span>Question</span><input name="q" [(ngModel)]="newFaq.question" placeholder="Is the food halal?" /></label>
+            <label class="field"><span>Answer</span><textarea name="a" rows="2" [(ngModel)]="newFaq.answer"></textarea></label>
             <div><button class="btn primary">+ Add</button></div>
           </form>
         </section>
         @for (f of faqs(); track f.id) {
           <section class="card faq">
             @if (editing() === 'faqs-' + f.id) {
-              <label class="field"><span>Sawal</span><input [(ngModel)]="draft.question" /></label>
-              <label class="field"><span>Jawab</span><textarea rows="3" [(ngModel)]="draft.answer"></textarea></label>
+              <label class="field"><span>Question</span><input [(ngModel)]="draft.question" /></label>
+              <label class="field"><span>Answer</span><textarea rows="3" [(ngModel)]="draft.answer"></textarea></label>
               <div class="row"><button class="btn primary sm" (click)="save('faqs', f.id)">Save</button><button class="btn ghost sm" (click)="editing.set(null)">Cancel</button></div>
             } @else {
               <div class="faq-q">{{ f.question }}</div>
@@ -121,13 +121,13 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
               <div class="row"><button class="btn ghost sm" (click)="edit('faqs', f)">Edit</button><button class="btn danger-ghost sm" (click)="del('faqs', f.id, f.question)">🗑 Delete</button></div>
             }
           </section>
-        } @empty { <div class="card empty muted">Koi FAQ nahi.</div> }
+        } @empty { <div class="card empty muted">No FAQs yet.</div> }
       }
 
       @case ('zones') {
         <section class="card">
-          <h2>Naya delivery area</h2>
-          <p class="muted small">Bot sirf inhi areas mein delivery order leta hai, aur yahi charge order mein judta hai.</p>
+          <h2>New delivery area</h2>
+          <p class="muted small">The bot only takes delivery orders for these areas, and adds this charge to the order.</p>
           <form class="form-row" (ngSubmit)="add('zones', newZone)">
             <label class="field grow"><span>Area</span><input name="z" [(ngModel)]="newZone.name" placeholder="Johar Town" /></label>
             <label class="field w-sm"><span>Delivery charge</span><input name="c" type="number" min="0" [(ngModel)]="newZone.charge" /></label>
@@ -152,7 +152,7 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
                     <td class="actions"><button class="btn ghost sm" (click)="edit('zones', z)">Edit</button><button class="btn danger-ghost sm" (click)="del('zones', z.id, z.name)">🗑</button></td>
                   </tr>
                 }
-              } @empty { <tr><td colspan="4" class="muted">Koi area nahi: bot delivery order nahi le sakega.</td></tr> }
+              } @empty { <tr><td colspan="4" class="muted">No areas yet: the bot can't take delivery orders.</td></tr> }
             </tbody>
           </table>
         </section>
@@ -202,7 +202,7 @@ export class MenuPage {
   async add(kind: Kind, body: Record<string, unknown>) {
     try {
       await this.api.create(this.rid(), kind, body);
-      this.toasts.ok('Add ho gaya');
+      this.toasts.ok('Added');
       if (kind === 'menu') this.newItem = { ...this.newItem, name: '', description: '', price: 0 };
       if (kind === 'deals') this.newDeal = { name: '', details: '', price: 0, isActive: true };
       if (kind === 'faqs') this.newFaq = { question: '', answer: '' };
@@ -217,7 +217,7 @@ export class MenuPage {
     try {
       await this.api.update(this.rid(), kind, id, this.draft);
       this.editing.set(null);
-      this.toasts.ok('Save ho gaya');
+      this.toasts.ok('Saved');
       await this.load(this.rid());
     } catch (e) {
       this.toasts.error(errorText(e));
@@ -227,7 +227,7 @@ export class MenuPage {
   async toggle(m: MenuItem) {
     try {
       await this.api.update(this.rid(), 'menu', m.id, { ...m, isAvailable: !m.isAvailable });
-      this.toasts.ok(`${m.name}: ${m.isAvailable ? 'abhi nahi milegi' : 'available'}`);
+      this.toasts.ok(`${m.name}: ${m.isAvailable ? 'unavailable' : 'available'}`);
       await this.load(this.rid());
     } catch (e) {
       this.toasts.error(errorText(e));
@@ -235,10 +235,10 @@ export class MenuPage {
   }
 
   async del(kind: Kind, id: number, label: string) {
-    if (!confirm(`"${label}" delete karna hai?`)) return;
+    if (!confirm(`Delete "${label}"?`)) return;
     try {
       await this.api.remove(this.rid(), kind, id);
-      this.toasts.ok('Delete ho gaya');
+      this.toasts.ok('Deleted');
       await this.load(this.rid());
     } catch (e) {
       this.toasts.error(errorText(e));

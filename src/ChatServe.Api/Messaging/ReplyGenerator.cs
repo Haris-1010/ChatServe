@@ -4,8 +4,8 @@ using Microsoft.Extensions.Options;
 namespace ChatServe.Api.Messaging;
 
 /// <summary>
-/// Customer message ka jawab banata hai. Phase 1 mein simple "hello" reply,
-/// Phase 2 mein isi interface ka Claude wala implementation aayega (menu + chat memory + tools).
+/// Builds the reply to a customer message. Phase 1 uses a simple "hello" reply;
+/// Phase 2 adds the Claude implementation of this interface (menu + chat memory + tools).
 /// </summary>
 public interface IReplyGenerator
 {
@@ -19,7 +19,7 @@ public sealed class HelloReplyGenerator(IOptionsMonitor<BotOptions> options) : I
         if (string.IsNullOrWhiteSpace(message.Text))
         {
             return Task.FromResult<string?>(
-                "Maazrat, abhi main sirf text messages samajh sakta hoon. Meharbani kar ke apna sawal likh kar bhejein. 🙏");
+                "Sorry, I can only read text messages for now. Please type your question. 🙏");
         }
 
         var greeting = string.IsNullOrWhiteSpace(message.CustomerName) ? "" : $"{message.CustomerName}, ";
@@ -28,7 +28,7 @@ public sealed class HelloReplyGenerator(IOptionsMonitor<BotOptions> options) : I
     }
 }
 
-/// <summary>Bot:UseAi har message par dekhta hai, taake dashboard se AI ON/OFF foran lagu ho.</summary>
+/// <summary>Checks Bot:UseAi on every message, so turning AI ON/OFF from the dashboard applies immediately.</summary>
 public sealed class SwitchingReplyGenerator(IOptionsMonitor<BotOptions> options, IServiceProvider services) : IReplyGenerator
 {
     public Task<string?> GenerateReplyAsync(IncomingMessage message, CancellationToken ct)

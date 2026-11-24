@@ -123,7 +123,7 @@ public class ClaudeReplyGeneratorTests
         var gen = NewGenerator(db, ai);
 
         Assert.Null(await gen.GenerateReplyAsync(Msg("w1", "salam"), default));
-        Assert.Equal(1, await db.ChatMessages.CountAsync()); // customer ka message phir bhi save
+        Assert.Equal(1, await db.ChatMessages.CountAsync()); // the customer's message is still saved
         Assert.Null(await gen.GenerateReplyAsync(Msg("w2", "salam", pnid: "UNKNOWN"), default));
         Assert.Empty(ai.Calls);
     }

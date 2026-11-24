@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ChatServe.Api.Dashboard;
 
-/// <summary>Restaurant ka profile, menu, deals, FAQs aur delivery zones. Bot inhi se jawab deta hai (agle message se hi naya data).</summary>
+/// <summary>Restaurant profile, menu, deals, FAQs and delivery zones. The bot answers from these (new data applies from the next message).</summary>
 public static class RestaurantEndpoints
 {
     public static void MapRestaurantEndpoints(this RouteGroupBuilder api)
@@ -16,10 +16,10 @@ public static class RestaurantEndpoints
         api.MapPost("/restaurants", async (NewRestaurantInput input, AppDbContext db, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(input.Name) || string.IsNullOrWhiteSpace(input.WhatsAppPhoneNumberId))
-                return Bad("Naam aur WhatsApp Phone number ID dono zaroori hain.");
+                return Bad("Name and WhatsApp Phone number ID are both required.");
             var phoneId = input.WhatsAppPhoneNumberId.Trim();
             if (await db.Restaurants.AnyAsync(r => r.WhatsAppPhoneNumberId == phoneId, ct))
-                return Bad("Is Phone number ID par pehle se restaurant mojood hai.");
+                return Bad("A restaurant already exists for this Phone number ID.");
 
             var r = new Restaurant { Name = input.Name.Trim(), WhatsAppPhoneNumberId = phoneId };
             db.Restaurants.Add(r);
@@ -39,13 +39,13 @@ public static class RestaurantEndpoints
             var r = await db.Restaurants.FirstOrDefaultAsync(x => x.Id == rid, ct);
             if (r is null) return Results.NotFound();
             if (string.IsNullOrWhiteSpace(input.Name) || string.IsNullOrWhiteSpace(input.WhatsAppPhoneNumberId))
-                return Bad("Naam aur WhatsApp Phone number ID zaroori hain.");
+                return Bad("Name and WhatsApp Phone number ID are required.");
             var phoneId = input.WhatsAppPhoneNumberId.Trim();
             if (await db.Restaurants.AnyAsync(x => x.Id != rid && x.WhatsAppPhoneNumberId == phoneId, ct))
-                return Bad("Ye Phone number ID kisi aur restaurant ke paas hai.");
+                return Bad("This Phone number ID belongs to another restaurant.");
             var staff = Digits(input.StaffWhatsAppNumber);
             if (staff is not null && staff.Length is < 10 or > 15)
-                return Bad("Staff number country code ke saath likhein, maslan 923001234567.");
+                return Bad("Enter the staff number with the country code, e.g. 923001234567.");
 
             r.Name = input.Name.Trim();
             r.WhatsAppPhoneNumberId = phoneId;
@@ -94,7 +94,7 @@ public static class RestaurantEndpoints
         {
             var item = await db.MenuItems.FirstOrDefaultAsync(m => m.Id == id && m.RestaurantId == rid, ct);
             if (item is null) return Results.NotFound();
-            db.MenuItems.Remove(item); // purane orders mein naam/price OrderItem mein mehfooz hai
+            db.MenuItems.Remove(item); // old orders keep the name/price in OrderItem
             await db.SaveChangesAsync(ct);
             return Results.NoContent();
         });
@@ -229,9 +229,9 @@ public static class RestaurantEndpoints
     public sealed record MenuItemInput(string? Category, string? Name, string? Description, decimal Price, bool IsAvailable, int? SortOrder)
     {
         public string? Validate() =>
-            string.IsNullOrWhiteSpace(Category) ? "Category zaroori hai."
-            : string.IsNullOrWhiteSpace(Name) ? "Dish ka naam zaroori hai."
-            : Price < 0 ? "Price manfi nahi ho sakti." : null;
+            string.IsNullOrWhiteSpace(Category) ? "Category is required."
+            : string.IsNullOrWhiteSpace(Name) ? "Dish name is required."
+            : Price < 0 ? "Price can't be negative." : null;
 
         public void Apply(MenuItem m)
         {
@@ -247,9 +247,9 @@ public static class RestaurantEndpoints
     public sealed record DealInput(string? Name, string? Details, decimal Price, bool IsActive)
     {
         public string? Validate() =>
-            string.IsNullOrWhiteSpace(Name) ? "Deal ka naam zaroori hai."
-            : string.IsNullOrWhiteSpace(Details) ? "Deal mein kya kya hai, ye likhein."
-            : Price < 0 ? "Price manfi nahi ho sakti." : null;
+            string.IsNullOrWhiteSpace(Name) ? "Deal name is required."
+            : string.IsNullOrWhiteSpace(Details) ? "Describe what's included in the deal."
+            : Price < 0 ? "Price can't be negative." : null;
 
         public void Apply(Deal d)
         {
@@ -263,14 +263,14 @@ public static class RestaurantEndpoints
     public sealed record FaqInput(string? Question, string? Answer)
     {
         public string? Validate() =>
-            string.IsNullOrWhiteSpace(Question) || string.IsNullOrWhiteSpace(Answer) ? "Sawal aur jawab dono likhein." : null;
+            string.IsNullOrWhiteSpace(Question) || string.IsNullOrWhiteSpace(Answer) ? "Enter both a question and an answer." : null;
     }
 
     public sealed record ZoneInput(string? Name, decimal Charge, bool IsActive)
     {
         public string? Validate() =>
-            string.IsNullOrWhiteSpace(Name) ? "Area ka naam zaroori hai."
-            : Charge < 0 ? "Charge manfi nahi ho sakta." : null;
+            string.IsNullOrWhiteSpace(Name) ? "Area name is required."
+            : Charge < 0 ? "Charge can't be negative." : null;
 
         public void Apply(DeliveryZone z)
         {

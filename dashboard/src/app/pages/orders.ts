@@ -6,12 +6,12 @@ import { errorText, Toasts } from '../core/toast';
 
 type Filter = 'active' | 'PendingConfirmation' | 'Completed' | 'Cancelled' | '';
 
-/** Har status ke baad agla qadam (button). */
+/** The next step (button) after each status. */
 const NEXT: Partial<Record<OrderStatus, { status: OrderStatus; label: string }[]>> = {
-  PendingConfirmation: [{ status: 'Confirmed', label: 'Khud confirm karein' }],
-  Confirmed: [{ status: 'Preparing', label: '👨‍🍳 Tayyar ho raha' }],
-  Preparing: [{ status: 'OutForDelivery', label: '🛵 Rider nikal gaya' }, { status: 'Completed', label: '✅ Mukammal' }],
-  OutForDelivery: [{ status: 'Completed', label: '✅ Deliver ho gaya' }],
+  PendingConfirmation: [{ status: 'Confirmed', label: 'Confirm manually' }],
+  Confirmed: [{ status: 'Preparing', label: '👨‍🍳 Preparing' }],
+  Preparing: [{ status: 'OutForDelivery', label: '🛵 Out for delivery' }, { status: 'Completed', label: '✅ Completed' }],
+  OutForDelivery: [{ status: 'Completed', label: '✅ Delivered' }],
 };
 
 @Component({
@@ -21,7 +21,7 @@ const NEXT: Partial<Record<OrderStatus, { status: OrderStatus; label: string }[]
     <div class="page-head">
       <h1>Orders</h1>
       <div class="row">
-        <label class="check"><input type="checkbox" [(ngModel)]="notify" /> Status badalne par customer ko WhatsApp karein</label>
+        <label class="check"><input type="checkbox" [(ngModel)]="notify" /> Notify customer on WhatsApp when status changes</label>
         <button class="btn ghost" (click)="exportCsv()">⬇ CSV</button>
       </div>
     </div>
@@ -33,7 +33,7 @@ const NEXT: Partial<Record<OrderStatus, { status: OrderStatus; label: string }[]
     </div>
 
     @if (orders().length === 0 && !loading()) {
-      <div class="card empty"><p class="muted">Is filter mein koi order nahi. Page har 10 second baad khud refresh hota hai.</p></div>
+      <div class="card empty"><p class="muted">No orders match this filter. This page refreshes every 10 seconds.</p></div>
     }
 
     <div class="order-grid">
@@ -60,7 +60,7 @@ const NEXT: Partial<Record<OrderStatus, { status: OrderStatus; label: string }[]
               @if (o.notes) { <div>📝 {{ o.notes }}</div> }
             </div>
           }
-          <div class="small muted">{{ when(o.createdAt) }}@if (o.confirmedAt) { · confirm {{ when(o.confirmedAt) }} }</div>
+          <div class="small muted">{{ when(o.createdAt) }}@if (o.confirmedAt) { · confirmed {{ when(o.confirmedAt) }} }</div>
           <div class="order-actions">
             @for (n of next[o.status] ?? []; track n.status) {
               <button class="btn primary sm" [disabled]="busy() === o.id" (click)="setStatus(o, n.status)">{{ n.label }}</button>
@@ -89,10 +89,10 @@ export class OrdersPage {
   next = NEXT;
   filters: { value: Filter; label: string }[] = [
     { value: 'active', label: 'Active' },
-    { value: 'PendingConfirmation', label: 'Confirm baqi' },
-    { value: 'Completed', label: 'Mukammal' },
+    { value: 'PendingConfirmation', label: 'Awaiting confirmation' },
+    { value: 'Completed', label: 'Completed' },
     { value: 'Cancelled', label: 'Cancelled' },
-    { value: '', label: 'Sab' },
+    { value: '', label: 'All' },
   ];
   private current = onRestaurant(rid => this.load(rid), 10);
   private rid = computed(() => this.current.id()!);
@@ -117,7 +117,7 @@ export class OrdersPage {
     this.busy.set(o.id);
     try {
       const res = await this.api.setOrderStatus(this.rid(), o.id, status, this.notify);
-      if (res.notifyError) this.toasts.error(`Status badal gaya, magar customer ko message nahi gaya: ${res.notifyError}`);
+      if (res.notifyError) this.toasts.error(`Status updated, but the customer message failed: ${res.notifyError}`);
       else this.toasts.ok(`Order #${o.id}: ${ORDER_STATUS_LABEL[status]}`);
       await this.load(this.rid());
     } catch (e) {
@@ -128,7 +128,7 @@ export class OrdersPage {
   }
 
   cancel(o: Order) {
-    if (confirm(`Order #${o.id} cancel karna hai?`)) this.setStatus(o, 'Cancelled');
+    if (confirm(`Cancel order #${o.id}?`)) this.setStatus(o, 'Cancelled');
   }
 
   exportCsv() {

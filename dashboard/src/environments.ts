@@ -1,6 +1,6 @@
 /**
- * API ka address. Khali = isi domain par (dotnet run ya ng serve proxy).
- * Dashboard alag domain (maslan Vercel) par ho to yahan backend ka URL likhein,
- * aur backend par Dashboard:AllowedOrigins mein dashboard ka URL.
+ * API address. Empty = same domain (dotnet run or the ng serve proxy).
+ * If the dashboard is on another domain (e.g. Vercel), put the backend URL here,
+ * and the dashboard URL in Dashboard:AllowedOrigins on the backend.
  */
 export const API_BASE = '';

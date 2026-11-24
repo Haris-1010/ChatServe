@@ -9,9 +9,9 @@ public interface IMessageQueue
 }
 
 /// <summary>
-/// In-memory queue taake webhook foran 200 OK de sake (Meta ko 200 jaldi na mile to woh dobara bhejta hai).
-/// Note: app restart par queue mein pade messages khatam ho jayenge. Phase 6 mein
-/// zaroorat pade to DB-backed queue (ya Hangfire) par shift kar sakte hain.
+/// In-memory queue so the webhook can return 200 OK right away (Meta resends if it doesn't get a quick 200).
+/// Note: messages still in the queue are lost on app restart. In Phase 6,
+/// we can move to a DB-backed queue (or Hangfire) if needed.
 /// </summary>
 public sealed class MessageQueue : IMessageQueue
 {

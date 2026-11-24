@@ -2,8 +2,8 @@ import { DestroyRef, effect, inject, untracked } from '@angular/core';
 import { CurrentRestaurant } from './api';
 
 /**
- * Restaurant badle to load() dobara, aur (optional) har N second baad refresh.
- * Page ke constructor (injection context) mein call karein.
+ * Re-runs load() when the restaurant changes, and (optionally) refreshes every N seconds.
+ * Call it from the page constructor (injection context).
  */
 export function onRestaurant(load: (rid: number) => unknown, refreshSeconds?: number) {
   const current = inject(CurrentRestaurant);

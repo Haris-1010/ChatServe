@@ -1,11 +1,11 @@
 namespace ChatServe.Api.Messaging;
 
-/// <summary>Webhook se nikala hua ek customer message, jo queue mein jata hai.</summary>
+/// <summary>A customer message parsed from the webhook, put on the queue.</summary>
 public sealed record IncomingMessage(
     string MessageId,
-    string PhoneNumberId,   // restaurant ka number (multi-tenant key)
-    string From,            // customer ka WhatsApp number (wa_id)
+    string PhoneNumberId,   // the restaurant's number (multi-tenant key)
+    string From,            // the customer's WhatsApp number (wa_id)
     string? CustomerName,
     string Type,
-    string? Text,           // text, button ya list reply ka text; baaki types mein null
+    string? Text,           // text, or the text of a button/list reply; null for other types
     DateTimeOffset ReceivedAt);

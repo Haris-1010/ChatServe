@@ -16,7 +16,7 @@ public sealed record DraftRequest(
     string? PaymentMethod,
     string? Notes);
 
-/// <summary>Ya order bana, ya error (AI ko wapas jata hai taake woh customer se theek maloomat le).</summary>
+/// <summary>Either the order, or an error (sent back to the AI so it can get the right details from the customer).</summary>
 public sealed record ServiceResult<T>(T? Value, string? Error) where T : class
 {
     public static ServiceResult<T> Ok(T value) => new(value, null);
@@ -24,14 +24,14 @@ public sealed record ServiceResult<T>(T? Value, string? Error) where T : class
 }
 
 /// <summary>
-/// Orders aur bookings ka saara business logic. Prices aur totals hamesha yahin menu se calculate hote hain,
-/// AI ka bataya hua hisaab kabhi use nahi hota.
+/// All business logic for orders and bookings. Prices and totals are always calculated here from the menu;
+/// the AI's numbers are never used.
 /// </summary>
 public sealed class OrderService(AppDbContext db, IOptionsMonitor<OrderOptions> options)
 {
     /// <summary>
-    /// Customer ka order draft (PendingConfirmation) banata ya badalta hai. Pehle wala pending draft hat jata hai.
-    /// <paramref name="restaurant"/> ke MenuItems, Deals aur DeliveryZones loaded hone chahiye.
+    /// Creates or replaces the customer's order draft (PendingConfirmation). Any earlier pending draft is removed.
+    /// <paramref name="restaurant"/> must have MenuItems, Deals and DeliveryZones loaded.
     /// </summary>
     public async Task<ServiceResult<Order>> SaveDraftAsync(
         Restaurant restaurant, Customer customer, DraftRequest req, DateTimeOffset now, CancellationToken ct)
@@ -93,7 +93,7 @@ public sealed class OrderService(AppDbContext db, IOptionsMonitor<OrderOptions> 
             deliveryCharge = zone.Charge;
         }
 
-        // Purana pending draft hata do: customer ka ek hi draft hota hai (kitchen tak gaya hi nahi tha).
+        // Remove the old pending draft: a customer has only one draft (it never reached the kitchen).
         var oldDrafts = await db.Orders
             .Where(o => o.CustomerId == customer.Id && o.Status == OrderStatus.PendingConfirmation)
             .ToListAsync(ct);
@@ -123,7 +123,7 @@ public sealed class OrderService(AppDbContext db, IOptionsMonitor<OrderOptions> 
         return ServiceResult<Order>.Ok(order);
     }
 
-    /// <summary>Customer ka taaza pending draft (expire nahi hua), warna null.</summary>
+    /// <summary>The customer's latest pending draft (not expired), or null.</summary>
     public Task<Order?> GetPendingDraftAsync(int customerId, DateTimeOffset now, CancellationToken ct)
     {
         var cutoff = now.AddMinutes(-options.CurrentValue.DraftExpiryMinutes);
@@ -149,7 +149,7 @@ public sealed class OrderService(AppDbContext db, IOptionsMonitor<OrderOptions> 
         await db.SaveChangesAsync(ct);
     }
 
-    /// <summary>Customer ke aakhri orders (drafts ke ilawa), naye pehle.</summary>
+    /// <summary>The customer's recent orders (excluding drafts), newest first.</summary>
     public Task<List<Order>> GetRecentOrdersAsync(int customerId, int count, CancellationToken ct) =>
         db.Orders
             .AsNoTracking()
@@ -204,7 +204,7 @@ public sealed class OrderService(AppDbContext db, IOptionsMonitor<OrderOptions> 
 
     private sealed record ResolvedItem(int? MenuItemId, int? DealId, string? Name, decimal Price, string? Error);
 
-    /// <summary>"M12" = menu item 12, "D3" = deal 3 (system prompt mein yahi codes hain).</summary>
+    /// <summary>"M12" = menu item 12, "D3" = deal 3 (the codes used in the system prompt).</summary>
     private static ResolvedItem ResolveItem(Restaurant r, string code)
     {
         code = (code ?? "").Trim().TrimStart('[').TrimEnd(']').ToUpperInvariant();

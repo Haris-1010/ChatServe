@@ -19,11 +19,11 @@ export class Toasts {
   }
 }
 
-/** Server ke ProblemDetails / error se padhne layak message. */
+/** A readable message from the server's ProblemDetails / error. */
 export function errorText(err: unknown): string {
   const e = err as { error?: { detail?: string; title?: string } | string; status?: number; message?: string };
-  if (e?.error && typeof e.error === 'object') return e.error.detail || e.error.title || 'Kuch ghalat ho gaya';
+  if (e?.error && typeof e.error === 'object') return e.error.detail || e.error.title || 'Something went wrong';
   if (typeof e?.error === 'string' && e.error) return e.error;
-  if (e?.status === 0) return 'Server se rabta nahi ho saka. Kya API chal rahi hai?';
-  return e?.message || 'Kuch ghalat ho gaya';
+  if (e?.status === 0) return 'Could not reach the server. Is the API running?';
+  return e?.message || 'Something went wrong';
 }

@@ -4,12 +4,12 @@ using ChatServe.Api.Data;
 
 namespace ChatServe.Api.Orders;
 
-/// <summary>Customer aur kitchen ko jaane wale fixed messages (AI ke baghair, hamesha sahi numbers).</summary>
+/// <summary>Fixed messages for the customer and kitchen (no AI, always correct numbers).</summary>
 public static partial class OrderFormatter
 {
     public static string TotalText(Order o, string currency) => $"{currency} {Money.Format(o.Total)}";
 
-    /// <summary>Confirm se pehle customer ko dikhane wali summary.</summary>
+    /// <summary>The summary shown to the customer before they confirm.</summary>
     public static string DraftSummary(Order o, string currency)
     {
         var sb = new StringBuilder();
@@ -19,17 +19,17 @@ public static partial class OrderFormatter
             sb.AppendLine($"Delivery ({o.DeliveryArea}): {currency} {Money.Format(o.DeliveryCharge)}");
         sb.AppendLine($"*Total: {TotalText(o, currency)}*");
         sb.AppendLine();
-        sb.AppendLine($"Naam: {o.CustomerName}");
+        sb.AppendLine($"Name: {o.CustomerName}");
         sb.AppendLine(o.Type switch
         {
             OrderType.Delivery => $"Address: {o.DeliveryAddress}",
-            OrderType.Takeaway => "Takeaway (restaurant se pick up)",
+            OrderType.Takeaway => "Takeaway (pick up from the restaurant)",
             _ => "Dine-in",
         });
         if (!string.IsNullOrWhiteSpace(o.PaymentMethod)) sb.AppendLine($"Payment: {o.PaymentMethod}");
         if (!string.IsNullOrWhiteSpace(o.Notes)) sb.AppendLine($"Note: {o.Notes}");
         sb.AppendLine();
-        sb.Append("Order pakka karne ke liye *confirm* likhein (ya 1). Kuch badalna ho to bata dein.");
+        sb.Append("Reply *confirm* (or 1) to place the order. Let us know if you want to change anything.");
         return sb.ToString();
     }
 
@@ -37,18 +37,18 @@ public static partial class OrderFormatter
     {
         var next = o.Type switch
         {
-            OrderType.Delivery => "Rider nikalte hi aap ko bata diya jayega.",
-            OrderType.Takeaway => "Tayyar hone par aap ko message kar diya jayega.",
-            _ => "Aap ke aane par tayyar milega.",
+            OrderType.Delivery => "We'll let you know as soon as the rider leaves.",
+            OrderType.Takeaway => "We'll message you when it's ready.",
+            _ => "It will be ready when you arrive.",
         };
-        return $"✅ Shukriya {o.CustomerName}! Aap ka order *#{o.Id}* confirm ho gaya hai.\n" +
+        return $"✅ Thank you {o.CustomerName}! Your order *#{o.Id}* is confirmed.\n" +
                $"Total: *{TotalText(o, currency)}*" + (string.IsNullOrWhiteSpace(o.PaymentMethod) ? "" : $" ({o.PaymentMethod})") + "\n" +
-               $"Order kitchen ko bhej diya gaya hai. {next}";
+               $"Your order has been sent to the kitchen. {next}";
     }
 
-    public const string DraftCancelledReply = "Theek hai, order cancel kar diya gaya hai. Kuch aur chahiye ho to bata dein. 🙂";
+    public const string DraftCancelledReply = "OK, your order has been cancelled. Let us know if you need anything else. 🙂";
 
-    /// <summary>Staff/kitchen ke WhatsApp par jaane wala ticket.</summary>
+    /// <summary>The ticket sent to the staff/kitchen WhatsApp.</summary>
     public static string KitchenTicket(Order o, string currency)
     {
         var sb = new StringBuilder();
@@ -66,13 +66,13 @@ public static partial class OrderFormatter
 
     public static string BookingTicket(TableBooking b) =>
         $"📅 *TABLE BOOKING REQUEST #{b.Id}*\n" +
-        $"{b.BookingTime:dddd d MMM, h:mm tt}, {b.People} afraad\n" +
+        $"{b.BookingTime:dddd d MMM, h:mm tt}, {b.People} people\n" +
         $"Customer: {b.CustomerName}, +{b.Phone}" +
         (string.IsNullOrWhiteSpace(b.Notes) ? "" : $"\nNote: {b.Notes}") +
-        "\nCustomer ko confirm kar dein.";
+        "\nPlease confirm with the customer.";
 
     public static string HandoverTicket(Customer c, string reason) =>
-        $"🙋 *Customer ko staff chahiye*\n{c.Name ?? "Customer"}, +{c.Phone}\nWajah: {reason}\nBot is customer ke liye ruk gaya hai, WhatsApp Business app/dashboard se jawab dein.";
+        $"🙋 *Customer needs staff*\n{c.Name ?? "Customer"}, +{c.Phone}\nReason: {reason}\nThe bot is paused for this customer. Reply from the WhatsApp Business app or the dashboard.";
 
     public static string StatusText(OrderStatus s) => s switch
     {
@@ -101,22 +101,22 @@ public static partial class OrderFormatter
         }
     }
 
-    // ---- Customer ke jawab pehchanna (AI ke baghair) ----
+    // ---- Recognising customer replies (without AI) ----
 
-    /// <summary>"confirm", "confirm kar do", "ok confirm", "1" waghera. Inkaar wale alfaaz ho to false.</summary>
+    /// <summary>"confirm", "confirm kar do", "ok confirm", "1", etc. False if it contains a negative word.</summary>
     public static bool IsConfirmation(string text, bool allowNumericShortcut)
     {
         var words = Words(text);
         if (words.Length == 0) return false;
         if (allowNumericShortcut && words is ["1"]) return true;
         if (words.Length > 5 || words.Any(NegativeWords.Contains)) return false;
-        // "na karo" = mat karo; lekin "confirm kar do na" (aakhir mein "na") haan hai
+        // "na karo" means "don't"; but "confirm kar do na" (with "na" at the end) is a yes
         for (var i = 0; i < words.Length - 1; i++)
             if (words[i] == "na" && words[i + 1].StartsWith("kar", StringComparison.Ordinal)) return false;
         return words.Any(w => w is "confirm" or "confirmed" or "confrm" or "conform" or "confirmd");
     }
 
-    /// <summary>"cancel", "cancel kar do" waghera.</summary>
+    /// <summary>"cancel", "cancel kar do", etc.</summary>
     public static bool IsCancellation(string text)
     {
         var words = Words(text);

@@ -10,11 +10,11 @@ namespace ChatServe.Api.WhatsApp;
 
 public interface IWhatsAppClient
 {
-    /// <summary>Text message bhejta hai. Wapas WhatsApp message id (wamid...) deta hai.</summary>
+    /// <summary>Sends a text message. Returns the WhatsApp message id (wamid...).</summary>
     Task<string?> SendTextAsync(string phoneNumberId, string to, string body,
         string? replyToMessageId = null, CancellationToken ct = default);
 
-    /// <summary>Customer ko blue ticks dikhata hai aur "typing..." indicator chala deta hai.</summary>
+    /// <summary>Shows the customer blue ticks and starts the "typing..." indicator.</summary>
     Task MarkAsReadAsync(string phoneNumberId, string messageId, bool showTyping = true,
         CancellationToken ct = default);
 }
@@ -27,19 +27,19 @@ public sealed class WhatsAppApiException(string message, int statusCode, string?
 }
 
 /// <summary>
-/// Graph API ka seedha HttpClient wrapper (koi SDK nahi).
+/// A plain HttpClient wrapper for the Graph API (no SDK).
 /// POST {base}/{version}/{phone-number-id}/messages
 /// </summary>
 public sealed class WhatsAppClient(HttpClient http, IOptionsMonitor<WhatsAppOptions> options, ILogger<WhatsAppClient> logger)
     : IWhatsAppClient
 {
-    /// <summary>WhatsApp text message ki hadd 4096 characters hai.</summary>
+    /// <summary>WhatsApp text messages are limited to 4096 characters.</summary>
     public const int MaxTextLength = 4096;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping // Urdu/emoji \uXXXX na banen
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping // don't escape Urdu/emoji as \uXXXX
     };
 
     public async Task<string?> SendTextAsync(string phoneNumberId, string to, string body,
@@ -88,7 +88,7 @@ public sealed class WhatsAppClient(HttpClient http, IOptionsMonitor<WhatsAppOpti
 
         using var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
-            // StringContent: body buffered rehta hai aur Content-Length header jata hai (chunked nahi).
+            // StringContent: the body is buffered and a Content-Length header is sent (not chunked).
             Content = new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json")
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", opts.AccessToken);
@@ -98,8 +98,8 @@ public sealed class WhatsAppClient(HttpClient http, IOptionsMonitor<WhatsAppOpti
 
         if (!response.IsSuccessStatusCode)
         {
-            // Aam errors: 190 = token expire/ghalat, 131030 = number allowed list mein nahi (test mode),
-            // 131047 = 24 ghante ki window khatam (sirf template ja sakta hai).
+            // Common errors: 190 = token expired/invalid, 131030 = number not in the allowed list (test mode),
+            // 131047 = the 24-hour window has closed (only a template can be sent).
             logger.LogError("WhatsApp API error {Status}: {Body}", (int)response.StatusCode, content);
             throw new WhatsAppApiException($"WhatsApp API returned {(int)response.StatusCode}",
                 (int)response.StatusCode, content);
@@ -108,7 +108,7 @@ public sealed class WhatsAppClient(HttpClient http, IOptionsMonitor<WhatsAppOpti
         return JsonDocument.Parse(string.IsNullOrWhiteSpace(content) ? "{}" : content);
     }
 
-    /// <summary>Logs mein poora phone number na jaye.</summary>
+    /// <summary>Keep full phone numbers out of the logs.</summary>
     internal static string Mask(string phone) =>
         phone.Length <= 4 ? "****" : new string('*', phone.Length - 4) + phone[^4..];
 }

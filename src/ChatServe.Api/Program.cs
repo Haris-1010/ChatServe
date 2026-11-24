@@ -11,20 +11,20 @@ using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Railway/Render "PORT" env var dete hain.
+// Railway/Render provide a "PORT" env var.
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(port))
     builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 // ---- Dashboard settings (DB) ----
-// Sab se aakhir mein: dashboard se save ki gayi settings appsettings/env vars par tarjeeh rakhti hain.
+// Added last: settings saved from the dashboard take priority over appsettings/env vars.
 var dashboardSettings = new DashboardSettingsProvider();
 ((IConfigurationBuilder)builder.Configuration).Add(dashboardSettings);
 builder.Services.AddSingleton(dashboardSettings);
 builder.Services.AddScoped<SettingsStore>();
 
 // ---- WhatsApp ----
-// Tokens khali hon to bhi app chalti hai (pehli dafa dashboard se set karne ke liye). Kami dashboard ke Status par dikhti hai.
+// The app runs even with empty tokens (so they can be set from the dashboard first). Missing values show on the dashboard status.
 builder.Services.AddOptions<WhatsAppOptions>()
     .Bind(builder.Configuration.GetSection(WhatsAppOptions.SectionName))
     .ValidateDataAnnotations();
@@ -36,15 +36,16 @@ builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<IWhatsAppClient, WhatsAppClient>(c => c.Timeout = TimeSpan.FromSeconds(20));
 
 // ---- Database (PostgreSQL) ----
-// ConnectionStrings:Default, ya Railway/Render ka DATABASE_URL.
-var connectionString = builder.Configuration.GetConnectionString("Default")
-                       ?? builder.Configuration["DATABASE_URL"]
-                       ?? throw new InvalidOperationException("ConnectionStrings:Default (ya DATABASE_URL) set karein.");
+// ConnectionStrings:Default, or Railway/Render's DATABASE_URL.
+// appsettings.json ships an empty ConnectionStrings:Default, so treat blank as "not set".
+var connectionString = new[] { builder.Configuration.GetConnectionString("Default"), builder.Configuration["DATABASE_URL"] }
+                           .FirstOrDefault(s => !string.IsNullOrWhiteSpace(s))
+                       ?? throw new InvalidOperationException("Set ConnectionStrings:Default (or DATABASE_URL).");
 builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(DatabaseUrl.ToConnectionString(connectionString)));
 
 // ---- AI (Claude) ----
 builder.Services.AddOptions<AiOptions>().Bind(builder.Configuration.GetSection(AiOptions.SectionName));
-builder.Services.AddSingleton<AnthropicClientProvider>(); // key dashboard se badle to naya client
+builder.Services.AddSingleton<AnthropicClientProvider>(); // new client when the key changes from the dashboard
 builder.Services.AddSingleton<IChatCompletionClient, ClaudeChatCompletionClient>();
 builder.Services.AddSingleton(TimeProvider.System);
 
@@ -57,7 +58,7 @@ builder.Services.AddScoped<SimulationContext>();
 // ---- Message pipeline ----
 builder.Services.AddSingleton<IMessageQueue, MessageQueue>();
 builder.Services.AddScoped<ClaudeReplyGenerator>();
-builder.Services.AddScoped<HelloReplyGenerator>(); // Phase 1 wala simple reply (Bot:UseAi = false)
+builder.Services.AddScoped<HelloReplyGenerator>(); // the simple Phase 1 reply (Bot:UseAi = false)
 builder.Services.AddScoped<IReplyGenerator, SwitchingReplyGenerator>();
 builder.Services.AddHostedService<MessageProcessingService>();
 
@@ -66,7 +67,7 @@ builder.AddDashboard();
 
 var app = builder.Build();
 
-// Startup par migrations chalao aur demo restaurant seed karo.
+// On startup, run migrations and seed the demo restaurant.
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -75,7 +76,7 @@ await using (var scope = app.Services.CreateAsyncScope())
     else
         await db.Database.EnsureCreatedAsync();
 
-    // Dashboard wali settings configuration mein load (seeder ko bhi dashboard wala PhoneNumberId mile).
+    // Load dashboard settings into configuration (so the seeder also gets the dashboard PhoneNumberId).
     await scope.ServiceProvider.GetRequiredService<SettingsStore>().LoadAsync();
 
     if (app.Configuration.GetValue("Bot:SeedDemoRestaurant", true))
@@ -83,18 +84,18 @@ await using (var scope = app.Services.CreateAsyncScope())
             app.Configuration["Bot:DemoStaffWhatsAppNumber"]);
 }
 
-app.UseDashboardStaticFiles(); // routing se pehle, taake JS/CSS files seedhi mil jayen
+app.UseDashboardStaticFiles(); // before routing, so JS/CSS files are served directly
 app.UseRouting();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
 if (!DashboardSetup.HasBuiltDashboard(app.Environment))
-    app.MapGet("/", () => Results.Ok(new { service = "ChatServe API", status = "running", dashboard = "dashboard/ folder mein 'npm run build' chalayein" }));
+    app.MapGet("/", () => Results.Ok(new { service = "ChatServe API", status = "running", dashboard = "run 'npm run build' in the dashboard/ folder" }));
 app.MapGet("/health", () => Results.Ok("healthy"));
 app.MapControllers();
 app.MapDashboard();
 
 app.Run();
 
-public partial class Program; // integration tests (WebApplicationFactory) ke liye
+public partial class Program; // for integration tests (WebApplicationFactory)

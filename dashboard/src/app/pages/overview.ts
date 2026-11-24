@@ -15,15 +15,15 @@ import { errorText, Toasts } from '../core/toast';
 
     @if (stats(); as s) {
       <div class="stats">
-        <div class="stat"><div class="stat-label">Aaj ke orders</div><div class="stat-value">{{ s.ordersToday }}</div></div>
-        <div class="stat"><div class="stat-label">Aaj ki sale</div><div class="stat-value">{{ money(s.revenueToday) }}</div></div>
+        <div class="stat"><div class="stat-label">Orders today</div><div class="stat-value">{{ s.ordersToday }}</div></div>
+        <div class="stat"><div class="stat-label">Sales today</div><div class="stat-value">{{ money(s.revenueToday) }}</div></div>
         <a class="stat link" routerLink="/orders"><div class="stat-label">Active orders</div><div class="stat-value">{{ s.activeOrders }}</div>
-          <div class="stat-sub">{{ s.awaitingConfirmation }} confirm ka intezar</div></a>
-        <a class="stat link" routerLink="/chats"><div class="stat-label">Aaj ki chats</div><div class="stat-value">{{ s.chatsToday }}</div>
-          <div class="stat-sub">{{ s.botRepliesToday }} bot jawab · {{ s.pausedChats }} staff ke paas</div></a>
-        <a class="stat link" routerLink="/bookings"><div class="stat-label">Aane wali bookings</div><div class="stat-value">{{ s.upcomingBookings }}</div></a>
+          <div class="stat-sub">{{ s.awaitingConfirmation }} awaiting confirmation</div></a>
+        <a class="stat link" routerLink="/chats"><div class="stat-label">Chats today</div><div class="stat-value">{{ s.chatsToday }}</div>
+          <div class="stat-sub">{{ s.botRepliesToday }} bot replies · {{ s.pausedChats }} with staff</div></a>
+        <a class="stat link" routerLink="/bookings"><div class="stat-label">Upcoming bookings</div><div class="stat-value">{{ s.upcomingBookings }}</div></a>
         <a class="stat link" routerLink="/customers"><div class="stat-label">Customers</div><div class="stat-value">{{ s.customers }}</div></a>
-        <div class="stat"><div class="stat-label">AI tokens aaj</div><div class="stat-value small-value">{{ s.inputTokensToday.toLocaleString() }} in</div>
+        <div class="stat"><div class="stat-label">AI tokens today</div><div class="stat-value small-value">{{ s.inputTokensToday.toLocaleString() }} in</div>
           <div class="stat-sub">{{ s.outputTokensToday.toLocaleString() }} out</div></div>
       </div>
     }
@@ -41,18 +41,18 @@ import { errorText, Toasts } from '../core/toast';
             }
           </ul>
           <div class="webhook">
-            <div class="muted small">Meta mein Callback URL (public HTTPS hona chahiye, maslan ngrok):</div>
+            <div class="muted small">Callback URL for Meta (must be public HTTPS, e.g. ngrok):</div>
             <code class="copy" (click)="copy(st.webhookUrl)" title="Copy">{{ st.webhookUrl }}</code>
           </div>
-          <a class="btn" routerLink="/settings">Settings kholein →</a>
+          <a class="btn" routerLink="/settings">Open Settings →</a>
         }
       </section>
 
       <section class="card">
-        <h2>Haal hi ke orders</h2>
+        <h2>Recent orders</h2>
         @if (stats()?.recentOrders?.length) {
           <table class="table">
-            <thead><tr><th>#</th><th>Customer</th><th>Status</th><th class="num">Total</th><th>Waqt</th></tr></thead>
+            <thead><tr><th>#</th><th>Customer</th><th>Status</th><th class="num">Total</th><th>Time</th></tr></thead>
             <tbody>
               @for (o of stats()!.recentOrders; track o.id) {
                 <tr>
@@ -66,7 +66,7 @@ import { errorText, Toasts } from '../core/toast';
             </tbody>
           </table>
         } @else {
-          <p class="muted">Abhi koi order nahi. <a routerLink="/simulator">Simulator</a> se bot ke saath test order kar ke dekhein.</p>
+          <p class="muted">No orders yet. Try placing a test order with the bot in the <a routerLink="/simulator">Simulator</a>.</p>
         }
       </section>
     </div>
@@ -98,6 +98,6 @@ export class OverviewPage {
   }
 
   copy(text: string) {
-    navigator.clipboard?.writeText(text).then(() => this.toasts.ok('Copy ho gaya'), () => this.toasts.error('Copy nahi ho saka, khud select kar ke copy karein'));
+    navigator.clipboard?.writeText(text).then(() => this.toasts.ok('Copied'), () => this.toasts.error('Could not copy. Please select the text and copy it yourself'));
   }
 }
