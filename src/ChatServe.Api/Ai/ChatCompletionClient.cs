@@ -32,9 +32,37 @@ public interface IChatCompletionClient
         CancellationToken ct);
 }
 
+/// <summary>
+/// API key dashboard se badal sakti hai, is liye client key ke hisaab se banta hai (har request par naya nahi:
+/// key wahi rahe to wahi client).
+/// </summary>
+public sealed class AnthropicClientProvider(IOptionsMonitor<AiOptions> options)
+{
+    private readonly object _gate = new();
+    private (string? Key, AnthropicClient Client)? _current;
+
+    public static bool HasKey(AiOptions o) =>
+        !string.IsNullOrWhiteSpace(o.ApiKey) || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY"));
+
+    public AnthropicClient Get()
+    {
+        var key = options.CurrentValue.ApiKey;
+        key = string.IsNullOrWhiteSpace(key) ? null : key.Trim();
+        lock (_gate)
+        {
+            if (_current is { } c && c.Key == key)
+                return c.Client;
+            // Key khali ho to SDK khud ANTHROPIC_API_KEY env var parhta hai.
+            var client = key is null ? new AnthropicClient() : new AnthropicClient { ApiKey = key };
+            _current = (key, client);
+            return client;
+        }
+    }
+}
+
 /// <summary>Claude Messages API (official Anthropic C# SDK), manual tool loop ke saath.</summary>
 public sealed class ClaudeChatCompletionClient(
-    AnthropicClient client,
+    AnthropicClientProvider clients,
     IOptionsMonitor<AiOptions> options,
     ILogger<ClaudeChatCompletionClient> logger) : IChatCompletionClient
 {
@@ -46,6 +74,7 @@ public sealed class ClaudeChatCompletionClient(
         CancellationToken ct)
     {
         var opts = options.CurrentValue;
+        var client = clients.Get();
 
         var messages = new List<MessageParam>();
         foreach (var turn in history)

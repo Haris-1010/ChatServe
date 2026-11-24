@@ -80,9 +80,10 @@ Customer (WhatsApp) → Meta Cloud API → webhook (ASP.NET Core)
 - ✅ **Phase 1 mukammal** (24 Nov 2026): webhook GET/POST, signature check, queue, duplicate protection, Graph API client, Dockerfile
 - ✅ **Phase 2 mukammal** (code + tests), tafseel `docs/PHASE2_PROGRESS.md`. Asli Claude key se test baqi
 - ✅ **Phase 3 mukammal** (24 Nov 2026): order tools, server-side totals, "confirm" par kitchen ko WhatsApp ticket, order status, table booking, human handover. Tafseel `docs/PHASE3_PROGRESS.md`
-- ⏭️ **Agla: Phase 4** (customer labels, no-shows, blacklist)
+- ✅ **Phase 5 (dashboard) ka bara hissa** (24 Nov 2026): Angular 22 dashboard (`dashboard/`) + admin API (`src/ChatServe.Api/Dashboard/`). Settings UI se (DB mein, foran lagu), menu/deals/FAQs/zones, orders, chats + staff reply + bot pause, bookings, customers CSV, bot simulator. Tafseel `docs/PHASE5_PROGRESS.md`
+- ⏭️ **Agla: Phase 4** (customer labels, no-shows, blacklist), phir dashboard par labels/filters
 - ⏳ **Talha ka kaam:** Meta app setup (README), Anthropic API key, `D:\Development\New folder` ko Claude desktop app (Settings > Claude Code > Remote Control) mein share karna taake code wahan copy ho
-- Code abhi cloud session mein hai (`/home/user/ChatServe`, local git). GitHub repo abhi connect nahi
+- GitHub: `Haris-1010/ChatServe` (public). Dashboard wala kaam branch/zip se wahan jana hai
 
 ## 10. Bechne ka plan (mukhtasar)
 - Demo dikhayen: owner khud apne phone se test number par message kare

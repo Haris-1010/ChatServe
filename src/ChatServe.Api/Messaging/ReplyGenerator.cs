@@ -27,3 +27,15 @@ public sealed class HelloReplyGenerator(IOptionsMonitor<BotOptions> options) : I
         return Task.FromResult<string?>(reply);
     }
 }
+
+/// <summary>Bot:UseAi har message par dekhta hai, taake dashboard se AI ON/OFF foran lagu ho.</summary>
+public sealed class SwitchingReplyGenerator(IOptionsMonitor<BotOptions> options, IServiceProvider services) : IReplyGenerator
+{
+    public Task<string?> GenerateReplyAsync(IncomingMessage message, CancellationToken ct)
+    {
+        IReplyGenerator inner = options.CurrentValue.UseAi
+            ? services.GetRequiredService<ClaudeReplyGenerator>()
+            : services.GetRequiredService<HelloReplyGenerator>();
+        return inner.GenerateReplyAsync(message, ct);
+    }
+}

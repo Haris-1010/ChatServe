@@ -176,3 +176,14 @@ public sealed class TableBooking
     public BookingStatus Status { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
+
+/// <summary>
+/// Dashboard se badli gayi settings (key = "WhatsApp:AccessToken" jaisi). App configuration mein sab se aakhir mein load hoti hain,
+/// is liye appsettings/env vars par tarjeeh rakhti hain. Restaurant se mutalliq nahi (poori app ki settings).
+/// </summary>
+public sealed class AppSetting
+{
+    public required string Key { get; set; }
+    public string Value { get; set; } = string.Empty;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}

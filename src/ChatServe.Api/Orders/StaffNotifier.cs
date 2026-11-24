@@ -15,10 +15,16 @@ public interface IStaffNotifier
 /// ek "start" message bhej de, ya Phase 7 mein approved utility template use karein.
 /// Order DB mein phir bhi save hota hai (Phase 5 dashboard par live orders).
 /// </summary>
-public sealed class WhatsAppStaffNotifier(IWhatsAppClient whatsApp, ILogger<WhatsAppStaffNotifier> logger) : IStaffNotifier
+public sealed class WhatsAppStaffNotifier(IWhatsAppClient whatsApp, SimulationContext simulation, ILogger<WhatsAppStaffNotifier> logger) : IStaffNotifier
 {
     public async Task NotifyAsync(Restaurant restaurant, string text, CancellationToken ct)
     {
+        if (simulation.IsActive)
+        {
+            simulation.StaffAlerts.Add(text); // dashboard simulator: asli WhatsApp nahi bhejna
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(restaurant.StaffWhatsAppNumber))
         {
             logger.LogWarning("Restaurant {Restaurant} has no StaffWhatsAppNumber; staff alert only logged:\n{Text}", restaurant.Name, text);
@@ -35,4 +41,11 @@ public sealed class WhatsAppStaffNotifier(IWhatsAppClient whatsApp, ILogger<What
             logger.LogError(ex, "Staff alert to {Restaurant} failed (24h window closed?)", restaurant.Name);
         }
     }
+}
+
+/// <summary>Dashboard ke chat simulator ke liye (scoped). Active ho to staff alerts WhatsApp ki jagah yahan jama hote hain.</summary>
+public sealed class SimulationContext
+{
+    public bool IsActive { get; set; }
+    public List<string> StaffAlerts { get; } = [];
 }

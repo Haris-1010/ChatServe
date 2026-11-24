@@ -1,6 +1,6 @@
-using Anthropic;
 using ChatServe.Api.Ai;
 using ChatServe.Api.Configuration;
+using ChatServe.Api.Dashboard;
 using ChatServe.Api.Data;
 using ChatServe.Api.Infrastructure;
 using ChatServe.Api.Messaging;
@@ -16,13 +16,18 @@ var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(port))
     builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
+// ---- Dashboard settings (DB) ----
+// Sab se aakhir mein: dashboard se save ki gayi settings appsettings/env vars par tarjeeh rakhti hain.
+var dashboardSettings = new DashboardSettingsProvider();
+((IConfigurationBuilder)builder.Configuration).Add(dashboardSettings);
+builder.Services.AddSingleton(dashboardSettings);
+builder.Services.AddScoped<SettingsStore>();
+
 // ---- WhatsApp ----
+// Tokens khali hon to bhi app chalti hai (pehli dafa dashboard se set karne ke liye). Kami dashboard ke Status par dikhti hai.
 builder.Services.AddOptions<WhatsAppOptions>()
     .Bind(builder.Configuration.GetSection(WhatsAppOptions.SectionName))
-    .ValidateDataAnnotations()
-    .Validate(o => !o.ValidateSignature || !string.IsNullOrEmpty(o.AppSecret),
-        "WhatsApp:AppSecret is required when WhatsApp:ValidateSignature is true.")
-    .ValidateOnStart();
+    .ValidateDataAnnotations();
 
 builder.Services.AddOptions<BotOptions>()
     .Bind(builder.Configuration.GetSection(BotOptions.SectionName));
@@ -39,12 +44,7 @@ builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(DatabaseUrl.ToConne
 
 // ---- AI (Claude) ----
 builder.Services.AddOptions<AiOptions>().Bind(builder.Configuration.GetSection(AiOptions.SectionName));
-builder.Services.AddSingleton(sp =>
-{
-    var key = sp.GetRequiredService<IOptions<AiOptions>>().Value.ApiKey;
-    // Key khali ho to SDK khud ANTHROPIC_API_KEY env var parhta hai.
-    return string.IsNullOrWhiteSpace(key) ? new AnthropicClient() : new AnthropicClient { ApiKey = key };
-});
+builder.Services.AddSingleton<AnthropicClientProvider>(); // key dashboard se badle to naya client
 builder.Services.AddSingleton<IChatCompletionClient, ClaudeChatCompletionClient>();
 builder.Services.AddSingleton(TimeProvider.System);
 
@@ -52,16 +52,17 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddOptions<OrderOptions>().Bind(builder.Configuration.GetSection(OrderOptions.SectionName));
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<IStaffNotifier, WhatsAppStaffNotifier>();
+builder.Services.AddScoped<SimulationContext>();
 
 // ---- Message pipeline ----
 builder.Services.AddSingleton<IMessageQueue, MessageQueue>();
-if (builder.Configuration.GetValue("Bot:UseAi", true))
-    builder.Services.AddScoped<IReplyGenerator, ClaudeReplyGenerator>();
-else
-    builder.Services.AddScoped<IReplyGenerator, HelloReplyGenerator>(); // Phase 1 wala simple reply
+builder.Services.AddScoped<ClaudeReplyGenerator>();
+builder.Services.AddScoped<HelloReplyGenerator>(); // Phase 1 wala simple reply (Bot:UseAi = false)
+builder.Services.AddScoped<IReplyGenerator, SwitchingReplyGenerator>();
 builder.Services.AddHostedService<MessageProcessingService>();
 
 builder.Services.AddControllers();
+builder.AddDashboard();
 
 var app = builder.Build();
 
@@ -74,14 +75,25 @@ await using (var scope = app.Services.CreateAsyncScope())
     else
         await db.Database.EnsureCreatedAsync();
 
+    // Dashboard wali settings configuration mein load (seeder ko bhi dashboard wala PhoneNumberId mile).
+    await scope.ServiceProvider.GetRequiredService<SettingsStore>().LoadAsync();
+
     if (app.Configuration.GetValue("Bot:SeedDemoRestaurant", true))
-        await DemoSeeder.SeedAsync(db, scope.ServiceProvider.GetRequiredService<IOptions<WhatsAppOptions>>(), app.Logger,
+        await DemoSeeder.SeedAsync(db, Options.Create(scope.ServiceProvider.GetRequiredService<IOptionsMonitor<WhatsAppOptions>>().CurrentValue), app.Logger,
             app.Configuration["Bot:DemoStaffWhatsAppNumber"]);
 }
 
-app.MapGet("/", () => Results.Ok(new { service = "ChatServe API", status = "running" }));
+app.UseDashboardStaticFiles(); // routing se pehle, taake JS/CSS files seedhi mil jayen
+app.UseRouting();
+app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
+
+if (!DashboardSetup.HasBuiltDashboard(app.Environment))
+    app.MapGet("/", () => Results.Ok(new { service = "ChatServe API", status = "running", dashboard = "dashboard/ folder mein 'npm run build' chalayein" }));
 app.MapGet("/health", () => Results.Ok("healthy"));
 app.MapControllers();
+app.MapDashboard();
 
 app.Run();
 

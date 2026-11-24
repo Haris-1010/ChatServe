@@ -6,6 +6,8 @@ namespace ChatServe.Api.Configuration;
 /// Meta WhatsApp Cloud API settings. Secrets (AccessToken, AppSecret, VerifyToken) ko
 /// appsettings.json mein commit na karein: local par user-secrets, server par environment variables.
 /// Env var format: WhatsApp__AccessToken, WhatsApp__PhoneNumberId, waghera.
+/// Dashboard ke Settings page se bhi set ho sakti hain (DB mein save, restart ki zaroorat nahi).
+/// Tokens khali hon to bhi app chalti hai, taake pehli dafa dashboard se set kiye ja saken.
 /// </summary>
 public sealed class WhatsAppOptions
 {
@@ -18,15 +20,12 @@ public sealed class WhatsAppOptions
     public string GraphApiVersion { get; set; } = "v23.0";
 
     /// <summary>Apni marzi ka random string. Yahi Meta dashboard mein "Verify token" mein daalna hai.</summary>
-    [Required]
     public string VerifyToken { get; set; } = string.Empty;
 
     /// <summary>Temporary (24 ghante) ya System User ka permanent token.</summary>
-    [Required]
     public string AccessToken { get; set; } = string.Empty;
 
     /// <summary>Default sender number. Webhook payload mein aane wala phone_number_id is par tarjeeh rakhta hai.</summary>
-    [Required]
     public string PhoneNumberId { get; set; } = string.Empty;
 
     /// <summary>App Settings &gt; Basic &gt; App secret. X-Hub-Signature-256 check karne ke liye.</summary>
@@ -45,4 +44,7 @@ public sealed class BotOptions
 
     /// <summary>Demo restaurant ka kitchen/staff WhatsApp number (923001234567). Confirmed orders yahan jaate hain.</summary>
     public string DemoStaffWhatsAppNumber { get; set; } = string.Empty;
+
+    /// <summary>false = Phase 1 wala simple welcome reply (AI kharcha zero).</summary>
+    public bool UseAi { get; set; } = true;
 }

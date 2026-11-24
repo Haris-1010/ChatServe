@@ -5,3 +5,7 @@
 **/*.user
 tests/
 .git/
+**/node_modules/
+dashboard/.angular/
+src/ChatServe.Api/wwwroot/
+*.zip

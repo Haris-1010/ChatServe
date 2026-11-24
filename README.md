@@ -4,6 +4,35 @@ Restaurants ke liye WhatsApp AI auto-reply agent.
 - **Phase 1 ✅** Meta webhook (verify + receive), Graph API reply
 - **Phase 2 ✅** Claude (Haiku 5.5) restaurant ke menu/settings/FAQs se jawab deta hai, chat memory PostgreSQL mein
 - **Phase 3 ✅** Order flow: AI tools (order draft, status, table booking, human handover), customer ka "confirm", kitchen ko WhatsApp ticket
+- **Phase 5 ✅ (dashboard)** Angular dashboard: saari settings, menu/deals/FAQs/delivery areas, live orders, chats (staff reply, bot pause), bookings, customers (CSV), aur WhatsApp ke baghair **bot simulator**
+
+## Jaldi chalana (dashboard ke saath)
+
+Zaroorat: .NET 8 SDK, Node.js 20+ (22 behtar), PostgreSQL (neeche Docker wala command).
+
+```bash
+cd dashboard
+```
+```bash
+npm install
+```
+```bash
+npm run build
+```
+```bash
+cd ..
+```
+```bash
+dotnet run --project src/ChatServe.Api
+```
+
+Browser mein **http://localhost:5040** kholein. Password (Development): `admin`. Login ke baad:
+1. **Settings**: WhatsApp (Phone number ID, Access token, Verify token, App secret) aur Anthropic API key daal kar **Save**, phir "Connection test" / "Claude test". Restart ki zaroorat nahi. **Dashboard password** bhi yahin badlein.
+2. **Menu, deals, FAQs** aur **Restaurant info**: bot inhi se jawab deta hai.
+3. **Bot test (simulator)**: WhatsApp ke baghair customer ban kar bot se baat karein (order, confirm, booking). Test chats ke number `000` se shuru hote hain, un par asli WhatsApp nahi jata.
+4. **Overview** par setup checklist batati hai kya baqi hai, aur Meta ke liye webhook URL.
+
+Dashboard par kaam karte waqt (hot reload): API `dotnet run` se chalti rahe, aur doosre terminal mein `cd dashboard` phir `npm start` → http://localhost:4200 (API calls proxy se 5040 par jati hain).
 
 Progress notes: `PROJECT_CONTEXT.md`, `docs/PHASE2_PROGRESS.md`, `docs/PHASE3_PROGRESS.md`.
 
@@ -40,6 +69,8 @@ Phase 3 ki files: `Orders/` (OrderService: validation + totals, RestaurantTools:
 
 ## Settings
 
+Neeche wali settings (connection string ke ilawa) **dashboard ke Settings page** se bhi set hoti hain. Wahan save ki gayi value DB (`AppSettings` table) mein jati hai, foran lagu hoti hai aur appsettings/user-secrets/env vars par tarjeeh rakhti hai. "Wapas default" se dashboard wali value hat jati hai.
+
 | Key | Kahan se milega |
 |---|---|
 | `WhatsApp:VerifyToken` | Apni marzi ka lamba random string. Yahi Meta dashboard mein daalna hai |
@@ -58,7 +89,9 @@ Phase 3 ki files: `Orders/` (OrderService: validation + totals, RestaurantTools:
 | `Orders:HandoverPauseHours` | Handover ke baad bot us customer ke liye kitne ghante chup (default 12) |
 | `Bot:DemoStaffWhatsAppNumber` | Demo restaurant ka kitchen/staff number, maslan `923001234567`. Confirmed orders, bookings, handover yahan aate hain |
 | `Bot:UseAi` | `false` = Phase 1 wala simple hello reply (AI kharcha zero) |
-| `Bot:SeedDemoRestaurant` | `true` = configured `PhoneNumberId` par "Talha's Karahi" demo menu khud ban jata hai |
+| `Bot:SeedDemoRestaurant` | `true` = configured `PhoneNumberId` par "Talha's Karahi" demo menu khud ban jata hai (app start par) |
+| `Dashboard:AdminPassword` | Dashboard ka password. Development mein na ho to `admin`. **Production mein zaroori** (env var `Dashboard__AdminPassword`), warna login band |
+| `Dashboard:AllowedOrigins` | Sirf tab jab dashboard alag domain par ho (maslan Vercel): `https://xyz.vercel.app`. Is ke saath `dashboard/src/environments.ts` mein `API_BASE` = backend URL |
 
 Secrets kabhi `appsettings.json` mein commit na karein.
 
@@ -81,7 +114,7 @@ App start hote hi tables khud ban jati hain (EF migrations) aur demo restaurant 
 
 **Anthropic:** console.anthropic.com par account > Billing mein credits (international card) > API Keys > Create key. Claude Pro plan ka API se taluq nahi, billing alag hai.
 
-**Server (Railway/Render env vars):** `WhatsApp__VerifyToken`, `WhatsApp__AccessToken`, `WhatsApp__PhoneNumberId`, `WhatsApp__AppSecret`, `Anthropic__ApiKey`, `DATABASE_URL` (double underscore).
+**Server (Railway/Render env vars):** `Dashboard__AdminPassword` (zaroori), `WhatsApp__VerifyToken`, `WhatsApp__AccessToken`, `WhatsApp__PhoneNumberId`, `WhatsApp__AppSecret`, `Anthropic__ApiKey`, `DATABASE_URL` (double underscore).
 
 ## Local chalana
 
@@ -164,7 +197,7 @@ docker build -t chatserve-api .
 ```bash
 docker run -p 8080:8080 -e WhatsApp__VerifyToken=... -e WhatsApp__AccessToken=... -e WhatsApp__PhoneNumberId=... -e WhatsApp__AppSecret=... chatserve-api
 ```
-Railway/Render `PORT` env var dete hain, app khud usi port par sunti hai.
+Railway/Render `PORT` env var dete hain, app khud usi port par sunti hai. Dockerfile dashboard bhi build karta hai, to deploy ke baad dashboard usi URL par milta hai.
 
 ## Abhi ki hudood (jaan boojh kar)
 - Queue in-memory hai: restart ke waqt queue mein pade (chand second ke) messages ja sakte hain.
@@ -173,4 +206,6 @@ Railway/Render `PORT` env var dete hain, app khud usi port par sunti hai.
 - Kitchen ticket free-form WhatsApp text hai: Meta sirf tab deliver karta hai jab staff number ne pichhle 24 ghante mein business number ko message kiya ho. Staff roz shift ke shuru mein "start" bhej de. Pakka hal: Phase 7 mein utility template. Order DB mein har haal mein save hota hai.
 - Bot ke liye "un-pause" (handover khatam) abhi sirf waqt guzarne se (`HandoverPauseHours`). Dashboard se Phase 5 mein.
 - Order status (Preparing, OutForDelivery) badalna aur customer ko update bhejna Phase 5 (dashboard) + Phase 7 (templates) mein.
-- Restaurant ka data abhi seed/DB se; dashboard Phase 5 mein. Abhi ek hi `AccessToken`.
+- Abhi ek hi `AccessToken` (saare restaurants ke liye). Dashboard ka ek hi admin password (har restaurant ke owner ka alag login baad mein).
+- Dashboard ka login token server restart par expire ho sakta hai (dobara login).
+- Settings ka naya `PhoneNumberId` demo restaurant khud nahi banata jab tak app restart na ho. Ya Restaurant info page se naya restaurant banayein / ID badlein.

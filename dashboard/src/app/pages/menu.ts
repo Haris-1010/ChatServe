@@ -1,0 +1,247 @@
+import { Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Api, Deal, Faq, MenuItem, money, Zone } from '../core/api';
+import { onRestaurant } from '../core/page';
+import { errorText, Toasts } from '../core/toast';
+
+type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
+
+@Component({
+  selector: 'app-menu',
+  imports: [FormsModule],
+  template: `
+    <div class="page-head"><h1>Menu, deals, FAQs</h1></div>
+    <p class="muted">Bot sirf yahan likhi cheezon se jawab deta hai. Badlaav agle customer message se lagu ho jata hai.</p>
+
+    <div class="tabs">
+      <button [class.active]="tab() === 'menu'" (click)="tab.set('menu')">🍛 Menu ({{ menu().length }})</button>
+      <button [class.active]="tab() === 'deals'" (click)="tab.set('deals')">🎁 Deals ({{ deals().length }})</button>
+      <button [class.active]="tab() === 'faqs'" (click)="tab.set('faqs')">❓ FAQs ({{ faqs().length }})</button>
+      <button [class.active]="tab() === 'zones'" (click)="tab.set('zones')">🛵 Delivery areas ({{ zones().length }})</button>
+    </div>
+
+    @switch (tab()) {
+      @case ('menu') {
+        <section class="card">
+          <h2>Nayi dish</h2>
+          <form class="form-row" (ngSubmit)="add('menu', newItem)">
+            <label class="field"><span>Category</span><input name="cat" [(ngModel)]="newItem.category" list="cats" placeholder="Karahi" /></label>
+            <label class="field grow"><span>Naam</span><input name="name" [(ngModel)]="newItem.name" placeholder="Chicken Karahi (Half)" /></label>
+            <label class="field grow"><span>Tafseel (optional)</span><input name="desc" [(ngModel)]="newItem.description" /></label>
+            <label class="field w-sm"><span>Price</span><input name="price" type="number" min="0" [(ngModel)]="newItem.price" /></label>
+            <button class="btn primary">+ Add</button>
+          </form>
+          <datalist id="cats">@for (c of categories(); track c) { <option [value]="c"></option> }</datalist>
+        </section>
+
+        @for (cat of categories(); track cat) {
+          <section class="card flush">
+            <h2 class="pad">{{ cat }}</h2>
+            <table class="table">
+              <thead><tr><th>Dish</th><th class="hide-sm">Tafseel</th><th class="num">Price</th><th>Available</th><th></th></tr></thead>
+              <tbody>
+                @for (m of byCategory(cat); track m.id) {
+                  @if (editing() === 'menu-' + m.id) {
+                    <tr class="editing">
+                      <td><input [(ngModel)]="draft.name" /><input class="mt" [(ngModel)]="draft.category" list="cats" placeholder="Category" /></td>
+                      <td class="hide-sm"><input [(ngModel)]="draft.description" /></td>
+                      <td class="num"><input type="number" class="w-sm" [(ngModel)]="draft.price" /></td>
+                      <td><input type="checkbox" [(ngModel)]="draft.isAvailable" /></td>
+                      <td class="actions"><button class="btn primary sm" (click)="save('menu', m.id)">Save</button><button class="btn ghost sm" (click)="editing.set(null)">✕</button></td>
+                    </tr>
+                  } @else {
+                    <tr [class.dim]="!m.isAvailable">
+                      <td>{{ m.name }}</td>
+                      <td class="muted hide-sm">{{ m.description }}</td>
+                      <td class="num">{{ money(m.price) }}</td>
+                      <td><label class="switch"><input type="checkbox" [checked]="m.isAvailable" (change)="toggle(m)" /><span></span></label></td>
+                      <td class="actions"><button class="btn ghost sm" (click)="edit('menu', m)">Edit</button><button class="btn danger-ghost sm" (click)="del('menu', m.id, m.name)">🗑</button></td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </section>
+        } @empty { <div class="card empty muted">Menu khali hai. Upar se pehli dish add karein.</div> }
+      }
+
+      @case ('deals') {
+        <section class="card">
+          <h2>Nayi deal</h2>
+          <form class="form-row" (ngSubmit)="add('deals', newDeal)">
+            <label class="field"><span>Naam</span><input name="n" [(ngModel)]="newDeal.name" placeholder="Family Deal" /></label>
+            <label class="field grow"><span>Is mein kya hai</span><input name="d" [(ngModel)]="newDeal.details" placeholder="Karahi Full + 4 Naan + 1.5L Drink" /></label>
+            <label class="field w-sm"><span>Price</span><input name="p" type="number" min="0" [(ngModel)]="newDeal.price" /></label>
+            <button class="btn primary">+ Add</button>
+          </form>
+        </section>
+        <section class="card flush">
+          <table class="table">
+            <thead><tr><th>Deal</th><th>Tafseel</th><th class="num">Price</th><th>Active</th><th></th></tr></thead>
+            <tbody>
+              @for (d of deals(); track d.id) {
+                @if (editing() === 'deals-' + d.id) {
+                  <tr class="editing">
+                    <td><input [(ngModel)]="draft.name" /></td><td><input [(ngModel)]="draft.details" /></td>
+                    <td class="num"><input type="number" class="w-sm" [(ngModel)]="draft.price" /></td>
+                    <td><input type="checkbox" [(ngModel)]="draft.isActive" /></td>
+                    <td class="actions"><button class="btn primary sm" (click)="save('deals', d.id)">Save</button><button class="btn ghost sm" (click)="editing.set(null)">✕</button></td>
+                  </tr>
+                } @else {
+                  <tr [class.dim]="!d.isActive">
+                    <td><b>{{ d.name }}</b></td><td class="muted">{{ d.details }}</td><td class="num">{{ money(d.price) }}</td>
+                    <td>{{ d.isActive ? '✅' : '—' }}</td>
+                    <td class="actions"><button class="btn ghost sm" (click)="edit('deals', d)">Edit</button><button class="btn danger-ghost sm" (click)="del('deals', d.id, d.name)">🗑</button></td>
+                  </tr>
+                }
+              } @empty { <tr><td colspan="5" class="muted">Koi deal nahi.</td></tr> }
+            </tbody>
+          </table>
+        </section>
+      }
+
+      @case ('faqs') {
+        <section class="card">
+          <h2>Naya sawal/jawab</h2>
+          <form class="form-col" (ngSubmit)="add('faqs', newFaq)">
+            <label class="field"><span>Sawal</span><input name="q" [(ngModel)]="newFaq.question" placeholder="Kya khana halal hai?" /></label>
+            <label class="field"><span>Jawab</span><textarea name="a" rows="2" [(ngModel)]="newFaq.answer"></textarea></label>
+            <div><button class="btn primary">+ Add</button></div>
+          </form>
+        </section>
+        @for (f of faqs(); track f.id) {
+          <section class="card faq">
+            @if (editing() === 'faqs-' + f.id) {
+              <label class="field"><span>Sawal</span><input [(ngModel)]="draft.question" /></label>
+              <label class="field"><span>Jawab</span><textarea rows="3" [(ngModel)]="draft.answer"></textarea></label>
+              <div class="row"><button class="btn primary sm" (click)="save('faqs', f.id)">Save</button><button class="btn ghost sm" (click)="editing.set(null)">Cancel</button></div>
+            } @else {
+              <div class="faq-q">{{ f.question }}</div>
+              <div class="faq-a">{{ f.answer }}</div>
+              <div class="row"><button class="btn ghost sm" (click)="edit('faqs', f)">Edit</button><button class="btn danger-ghost sm" (click)="del('faqs', f.id, f.question)">🗑 Delete</button></div>
+            }
+          </section>
+        } @empty { <div class="card empty muted">Koi FAQ nahi.</div> }
+      }
+
+      @case ('zones') {
+        <section class="card">
+          <h2>Naya delivery area</h2>
+          <p class="muted small">Bot sirf inhi areas mein delivery order leta hai, aur yahi charge order mein judta hai.</p>
+          <form class="form-row" (ngSubmit)="add('zones', newZone)">
+            <label class="field grow"><span>Area</span><input name="z" [(ngModel)]="newZone.name" placeholder="Johar Town" /></label>
+            <label class="field w-sm"><span>Delivery charge</span><input name="c" type="number" min="0" [(ngModel)]="newZone.charge" /></label>
+            <button class="btn primary">+ Add</button>
+          </form>
+        </section>
+        <section class="card flush">
+          <table class="table">
+            <thead><tr><th>Area</th><th class="num">Charge</th><th>Active</th><th></th></tr></thead>
+            <tbody>
+              @for (z of zones(); track z.id) {
+                @if (editing() === 'zones-' + z.id) {
+                  <tr class="editing">
+                    <td><input [(ngModel)]="draft.name" /></td>
+                    <td class="num"><input type="number" class="w-sm" [(ngModel)]="draft.charge" /></td>
+                    <td><input type="checkbox" [(ngModel)]="draft.isActive" /></td>
+                    <td class="actions"><button class="btn primary sm" (click)="save('zones', z.id)">Save</button><button class="btn ghost sm" (click)="editing.set(null)">✕</button></td>
+                  </tr>
+                } @else {
+                  <tr [class.dim]="!z.isActive">
+                    <td>{{ z.name }}</td><td class="num">{{ money(z.charge) }}</td><td>{{ z.isActive ? '✅' : '—' }}</td>
+                    <td class="actions"><button class="btn ghost sm" (click)="edit('zones', z)">Edit</button><button class="btn danger-ghost sm" (click)="del('zones', z.id, z.name)">🗑</button></td>
+                  </tr>
+                }
+              } @empty { <tr><td colspan="4" class="muted">Koi area nahi: bot delivery order nahi le sakega.</td></tr> }
+            </tbody>
+          </table>
+        </section>
+      }
+    }
+  `,
+})
+export class MenuPage {
+  private api = inject(Api);
+  private toasts = inject(Toasts);
+  tab = signal<Kind>('menu');
+  menu = signal<MenuItem[]>([]);
+  deals = signal<Deal[]>([]);
+  faqs = signal<Faq[]>([]);
+  zones = signal<Zone[]>([]);
+  editing = signal<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  draft: any = {};
+  newItem = { category: '', name: '', description: '', price: 0, isAvailable: true };
+  newDeal = { name: '', details: '', price: 0, isActive: true };
+  newFaq = { question: '', answer: '' };
+  newZone = { name: '', charge: 0, isActive: true };
+  money = money;
+  categories = computed(() => [...new Set(this.menu().map(m => m.category))]);
+  private current = onRestaurant(rid => this.load(rid));
+  private rid = computed(() => this.current.id()!);
+
+  byCategory(cat: string) { return this.menu().filter(m => m.category === cat); }
+
+  async load(rid: number) {
+    try {
+      const [menu, deals, faqs, zones] = await Promise.all([
+        this.api.list<MenuItem>(rid, 'menu'), this.api.list<Deal>(rid, 'deals'),
+        this.api.list<Faq>(rid, 'faqs'), this.api.list<Zone>(rid, 'zones'),
+      ]);
+      this.menu.set(menu); this.deals.set(deals); this.faqs.set(faqs); this.zones.set(zones);
+    } catch (e) {
+      this.toasts.error(errorText(e));
+    }
+  }
+
+  edit(kind: Kind, row: object) {
+    this.draft = { ...row };
+    this.editing.set(`${kind}-${(row as { id: number }).id}`);
+  }
+
+  async add(kind: Kind, body: Record<string, unknown>) {
+    try {
+      await this.api.create(this.rid(), kind, body);
+      this.toasts.ok('Add ho gaya');
+      if (kind === 'menu') this.newItem = { ...this.newItem, name: '', description: '', price: 0 };
+      if (kind === 'deals') this.newDeal = { name: '', details: '', price: 0, isActive: true };
+      if (kind === 'faqs') this.newFaq = { question: '', answer: '' };
+      if (kind === 'zones') this.newZone = { name: '', charge: 0, isActive: true };
+      await this.load(this.rid());
+    } catch (e) {
+      this.toasts.error(errorText(e));
+    }
+  }
+
+  async save(kind: Kind, id: number) {
+    try {
+      await this.api.update(this.rid(), kind, id, this.draft);
+      this.editing.set(null);
+      this.toasts.ok('Save ho gaya');
+      await this.load(this.rid());
+    } catch (e) {
+      this.toasts.error(errorText(e));
+    }
+  }
+
+  async toggle(m: MenuItem) {
+    try {
+      await this.api.update(this.rid(), 'menu', m.id, { ...m, isAvailable: !m.isAvailable });
+      this.toasts.ok(`${m.name}: ${m.isAvailable ? 'abhi nahi milegi' : 'available'}`);
+      await this.load(this.rid());
+    } catch (e) {
+      this.toasts.error(errorText(e));
+    }
+  }
+
+  async del(kind: Kind, id: number, label: string) {
+    if (!confirm(`"${label}" delete karna hai?`)) return;
+    try {
+      await this.api.remove(this.rid(), kind, id);
+      this.toasts.ok('Delete ho gaya');
+      await this.load(this.rid());
+    } catch (e) {
+      this.toasts.error(errorText(e));
+    }
+  }
+}

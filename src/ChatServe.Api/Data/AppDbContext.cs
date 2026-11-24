@@ -14,6 +14,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<TableBooking> TableBookings => Set<TableBooking>();
+    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -88,6 +89,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.UnitPrice).HasPrecision(10, 2);
             e.Property(x => x.LineTotal).HasPrecision(10, 2);
+        });
+
+        b.Entity<AppSetting>(e =>
+        {
+            e.HasKey(x => x.Key);
+            e.Property(x => x.Key).HasMaxLength(200);
         });
 
         b.Entity<TableBooking>(e =>

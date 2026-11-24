@@ -482,3 +482,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Angular dashboard ka build (dashboard/ mein npm run build)
+src/ChatServe.Api/wwwroot/
