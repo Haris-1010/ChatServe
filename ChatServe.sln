@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{14AE2DEE-4EC9-4BBC-ADDE-47A4A0036563}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatServe.Api", "src\ChatServe.Api\ChatServe.Api.csproj", "{AE9496E5-5B10-406E-B5DB-3EE09D823464}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{AC66F0AB-7DF2-40FD-94CC-E4049CD8D219}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatServe.Api.Tests", "tests\ChatServe.Api.Tests\ChatServe.Api.Tests.csproj", "{B5F715F7-B5E8-4684-BF44-F7FAA7F30627}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AE9496E5-5B10-406E-B5DB-3EE09D823464}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AE9496E5-5B10-406E-B5DB-3EE09D823464}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AE9496E5-5B10-406E-B5DB-3EE09D823464}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AE9496E5-5B10-406E-B5DB-3EE09D823464}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B5F715F7-B5E8-4684-BF44-F7FAA7F30627}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B5F715F7-B5E8-4684-BF44-F7FAA7F30627}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B5F715F7-B5E8-4684-BF44-F7FAA7F30627}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B5F715F7-B5E8-4684-BF44-F7FAA7F30627}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{AE9496E5-5B10-406E-B5DB-3EE09D823464} = {14AE2DEE-4EC9-4BBC-ADDE-47A4A0036563}
+		{B5F715F7-B5E8-4684-BF44-F7FAA7F30627} = {AC66F0AB-7DF2-40FD-94CC-E4049CD8D219}
+	EndGlobalSection
+EndGlobal
