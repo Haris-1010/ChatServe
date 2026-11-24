@@ -184,7 +184,7 @@ textarea { resize: vertical; }
 .table .actions .btn + .btn { margin-left: 4px; }
 .table tr.dim td { opacity: .5; }
 .table tr.editing td { background: var(--primary-soft); }
-.card > .table { margin: 0 -18px -18px; width: calc(100% + 36px); }
+.card:not(.flush) > .table { margin: 0 -18px -18px; width: calc(100% + 36px); }
 
 /* ---------- Badges ---------- */
 .badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
