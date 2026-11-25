@@ -111,7 +111,7 @@ public class StaffCommandTests
         Assert.Equal(OrderStatus.OutForDelivery, (await c.Db.Orders.SingleAsync()).Status);
         var sent = Assert.Single(c.WhatsApp.Sent);
         Assert.Equal(CustomerPhone, sent.To);
-        Assert.Contains("out for delivery", sent.Body);
+        Assert.Contains("rider nikal gaya", sent.Body); // no text from this customer yet: Roman Urdu
         Assert.Contains("Updated by +" + Manager, Assert.Single(c.Staff.Alerts));
         Assert.Empty(c.Ai.Calls);
         Assert.Equal(1, await c.Db.Customers.CountAsync()); // no customer record for the staff member

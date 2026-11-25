@@ -90,7 +90,8 @@ public static class OperationsEndpoints
             if (req.NotifyCustomer)
             {
                 var restaurant = await db.Restaurants.AsNoTracking().FirstAsync(r => r.Id == rid, ct);
-                var text = OrderStatusMessage(order, restaurant.Currency);
+                var ru = await CustomerText.PrefersRomanUrduAsync(db, order.CustomerId, null, ct);
+                var text = CustomerText.Status(order, restaurant.Currency, ru);
                 notifyError = await SendStaffMessageAsync(db, whatsApp, restaurant, order.CustomerId, order.Phone, text, now, ct);
             }
             return Results.Ok(new { order, NotifyError = notifyError });

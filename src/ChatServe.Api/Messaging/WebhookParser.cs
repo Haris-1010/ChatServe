@@ -36,7 +36,8 @@ public static class WebhookParser
                     CustomerName: name,
                     Type: msg.Type ?? "unknown",
                     Text: GetText(msg),
-                    ReceivedAt: ParseTimestamp(msg.Timestamp)));
+                    ReceivedAt: ParseTimestamp(msg.Timestamp),
+                    MediaId: msg.Type == "audio" ? msg.Audio?.Id : null));
             }
         }
 

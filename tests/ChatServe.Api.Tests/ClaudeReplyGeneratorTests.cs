@@ -98,7 +98,7 @@ public class ClaudeReplyGeneratorTests
 
         var reply = await NewGenerator(db, ai).GenerateReplyAsync(Msg("w1", null, "image"), default);
 
-        Assert.Equal(ClaudeReplyGenerator.NonTextReply, reply);
+        Assert.Equal(CustomerText.CannotRead(ru: true, voice: false), reply); // no text yet: Roman Urdu
         Assert.Empty(ai.Calls);
     }
 

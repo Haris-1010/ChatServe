@@ -137,7 +137,8 @@ public sealed class StaffCommandHandler(
         order.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
 
-        var customerText = OperationsEndpoints.OrderStatusMessage(order, restaurant.Currency);
+        var ru = await CustomerText.PrefersRomanUrduAsync(db, order.CustomerId, null, ct);
+        var customerText = CustomerText.Status(order, restaurant.Currency, ru);
         var error = await OperationsEndpoints.SendStaffMessageAsync(db, whatsApp, restaurant, order.CustomerId, order.Phone, customerText, now, ct);
 
         // Keep the rest of the team in the loop (like a group).

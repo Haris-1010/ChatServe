@@ -74,7 +74,7 @@ public class OrderFlowTests
 
         // 2 x 2600 + 100 delivery: the server's math, not the AI's
         Assert.Contains("Total: Rs 5,300", summary);
-        Assert.Contains("confirm", summary);
+        Assert.Contains("*haan* likh dein", summary); // the customer writes Roman Urdu: a natural yes, no "confirm (or 1)"
         var draft = await c.Db.Orders.Include(o => o.Items).SingleAsync();
         Assert.Equal(OrderStatus.PendingConfirmation, draft.Status);
         Assert.Equal(5300, draft.Total);
@@ -125,7 +125,7 @@ public class OrderFlowTests
 
         var reply = await gen.GenerateReplyAsync(Msg("cancel kar dein"), default);
 
-        Assert.Equal(OrderFormatter.DraftCancelledReply, reply);
+        Assert.Equal(CustomerText.DraftCancelled(ru: true), reply);
         Assert.Equal(OrderStatus.Cancelled, (await c.Db.Orders.SingleAsync()).Status);
         Assert.Empty(c.Staff.Alerts);
     }

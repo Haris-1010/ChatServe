@@ -64,6 +64,15 @@ public sealed class WebhookMessage
     [JsonPropertyName("text")] public WebhookText? Text { get; set; }
     [JsonPropertyName("interactive")] public WebhookInteractive? Interactive { get; set; }
     [JsonPropertyName("button")] public WebhookButton? Button { get; set; }
+    [JsonPropertyName("audio")] public WebhookMedia? Audio { get; set; }
+}
+
+/// <summary>A media attachment (voice note, audio). The file is downloaded separately with its id.</summary>
+public sealed class WebhookMedia
+{
+    [JsonPropertyName("id")] public string? Id { get; set; }
+    [JsonPropertyName("mime_type")] public string? MimeType { get; set; }
+    [JsonPropertyName("voice")] public bool? Voice { get; set; }
 }
 
 public sealed class WebhookText

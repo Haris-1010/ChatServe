@@ -1,6 +1,7 @@
 using ChatServe.Api.Ai;
 using ChatServe.Api.Data;
 using ChatServe.Api.Orders;
+using ChatServe.Api.WhatsApp;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -19,7 +20,9 @@ public sealed class ClaudeReplyGenerator(
     IOptionsMonitor<AiOptions> aiOptions,
     TimeProvider clock,
     ILogger<ClaudeReplyGenerator> logger,
-    StaffCommandHandler? staffCommands = null) : IReplyGenerator
+    StaffCommandHandler? staffCommands = null,
+    IVoiceTranscriber? voice = null,
+    IWhatsAppClient? media = null) : IReplyGenerator
 {
     public const string NonTextReply =
         "Sorry, I can only read text messages for now. Please type your question. 🙏";
@@ -52,6 +55,12 @@ public sealed class ClaudeReplyGenerator(
         if (staffCommands is not null && await staffCommands.TryHandleAsync(restaurant, message, ct) is { } staffReply)
             return staffReply;
 
+        // A voice note: turn it into text first, then it's handled like a typed message.
+        var isVoice = message.Type == "audio";
+        var text = message.Text;
+        if (string.IsNullOrWhiteSpace(text) && isVoice)
+            text = await TranscribeAsync(message, ct);
+
         var now = clock.GetUtcNow();
         var customer = await UpsertCustomerAsync(restaurant.Id, message, now, ct);
 
@@ -60,7 +69,7 @@ public sealed class ClaudeReplyGenerator(
             RestaurantId = restaurant.Id,
             CustomerId = customer.Id,
             Role = ChatRole.Customer,
-            Text = message.Text ?? $"[{message.Type}]",
+            Text = isVoice && text is not null ? "🎤 " + text : text ?? $"[{message.Type}]",
             WhatsAppMessageId = message.MessageId,
             CreatedAt = now,
         });
@@ -72,48 +81,54 @@ public sealed class ClaudeReplyGenerator(
         if (customer.BotPausedUntil > now)
             return null; // human handover: staff are talking to this customer
 
+        // Fixed messages go out in the customer's language (Roman Urdu or English), like the AI replies.
+        var ru = await CustomerText.PrefersRomanUrduAsync(db, customer.Id, text, ct);
+
         string reply;
         AiResult? result = null;
         Order? newDraft = null;
         var staffAlerts = new List<string>();
-        var pending = string.IsNullOrWhiteSpace(message.Text) ? null : await orders.GetPendingDraftAsync(customer.Id, now, ct);
+        var pending = string.IsNullOrWhiteSpace(text) ? null : await orders.GetPendingDraftAsync(customer.Id, now, ct);
 
-        if (string.IsNullOrWhiteSpace(message.Text))
+        if (string.IsNullOrWhiteSpace(text))
         {
-            reply = NonTextReply; // no AI call needed, save money
+            reply = CustomerText.CannotRead(ru, isVoice); // no AI call needed, save money
         }
-        else if (pending is not null && OrderFormatter.IsConfirmation(message.Text, await SummaryWasLastBotMessageAsync(customer.Id, pending, ct)))
+        else if (pending is not null && OrderFormatter.IsConfirmation(text, await SummaryWasLastBotMessageAsync(customer.Id, pending, ct)))
         {
             // The customer confirmed: the order now goes to the kitchen. Fixed reply, no AI call.
             await orders.ConfirmAsync(pending, now, ct);
-            reply = OrderFormatter.ConfirmedReply(pending, restaurant.Currency);
+            reply = CustomerText.Confirmed(pending, restaurant.Currency, ru);
             staffAlerts.Add(OrderFormatter.KitchenTicket(pending, restaurant.Currency));
             logger.LogInformation("Order {OrderId} confirmed for {Restaurant}, total {Total}", pending.Id, restaurant.Name, pending.Total);
         }
-        else if (pending is not null && OrderFormatter.IsCancellation(message.Text))
+        else if (pending is not null && OrderFormatter.IsCancellation(text))
         {
             await orders.CancelDraftAsync(pending, now, ct);
-            reply = OrderFormatter.DraftCancelledReply;
+            reply = CustomerText.DraftCancelled(ru);
         }
         else
         {
-            var tools = new OrderToolExecutor(orders, restaurant, customer, now);
+            var tools = new OrderToolExecutor(orders, restaurant, customer, now, ru);
             var history = WithCurrentTime(await LoadHistoryAsync(customer.Id, ct), now, PendingNote(pending, restaurant.Currency));
+            var failed = false;
             try
             {
                 result = await ai.CompleteAsync(SystemPromptBuilder.Build(restaurant), history, RestaurantTools.Build(restaurant), tools, ct);
                 logger.LogInformation(
-                    "AI reply for {Restaurant}: in={In} out={Out} cacheRead={Cache} tools={Tools} refused={Refused}",
-                    restaurant.Name, result.InputTokens, result.OutputTokens, result.CacheReadTokens, result.ToolCalls, result.Refused);
+                    "AI reply for {Restaurant}: in={In} out={Out} cacheRead={Cache} cacheWrite={CacheWrite} tools={Tools} refused={Refused}",
+                    restaurant.Name, result.InputTokens, result.OutputTokens, result.CacheReadTokens, result.CacheWriteTokens, result.ToolCalls, result.Refused);
 
-                reply = result.Refused || result.Text is null
-                    ? tools.HandedOver ? HandoverReply : FallbackReply
-                    : result.Text;
+                failed = result.Refused || result.Text is null;
+                reply = failed
+                    ? tools.HandedOver ? CustomerText.Handover(ru) : CustomerText.Fallback(ru)
+                    : result.Text!;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogError(ex, "AI call failed for message {MessageId}", message.MessageId);
-                reply = tools.HandedOver ? HandoverReply : FallbackReply;
+                failed = true;
+                reply = tools.HandedOver ? CustomerText.Handover(ru) : CustomerText.Fallback(ru);
             }
 
             newDraft = tools.Draft;
@@ -122,8 +137,8 @@ public sealed class ClaudeReplyGenerator(
             // Safety net: if a draft was created, always show the customer the correct total, even if the AI left out the summary.
             if (newDraft is not null && !reply.Contains(OrderFormatter.TotalText(newDraft, restaurant.Currency), StringComparison.Ordinal))
             {
-                var summary = OrderFormatter.DraftSummary(newDraft, restaurant.Currency);
-                reply = reply == FallbackReply ? summary : reply + "\n\n" + summary;
+                var summary = OrderFormatter.DraftSummary(newDraft, restaurant.Currency, ru);
+                reply = failed && !tools.HandedOver ? summary : reply + "\n\n" + summary;
             }
         }
 
@@ -152,6 +167,25 @@ public sealed class ClaudeReplyGenerator(
             await staff.NotifyAsync(restaurant, alert, ct);
 
         return reply;
+    }
+
+    /// <summary>Downloads and transcribes a voice note. Null (and a "please type" reply) when voice is off or it fails.</summary>
+    private async Task<string?> TranscribeAsync(IncomingMessage message, CancellationToken ct)
+    {
+        if (voice is not { IsConfigured: true } || media is null || message.MediaId is null)
+            return null;
+        try
+        {
+            var file = await media.DownloadMediaAsync(message.MediaId, ct);
+            var text = await voice.TranscribeAsync(file, ct);
+            logger.LogInformation("Voice note {MessageId} transcribed ({Bytes} bytes, {Chars} chars)", message.MessageId, file.Data.Length, text?.Length ?? 0);
+            return string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Voice note {MessageId} could not be transcribed", message.MessageId);
+            return null;
+        }
     }
 
     public const string HandoverReply =

@@ -8,4 +8,5 @@ public sealed record IncomingMessage(
     string? CustomerName,
     string Type,
     string? Text,           // text, or the text of a button/list reply; null for other types
-    DateTimeOffset ReceivedAt);
+    DateTimeOffset ReceivedAt,
+    string? MediaId = null); // voice note / audio: downloaded and transcribed

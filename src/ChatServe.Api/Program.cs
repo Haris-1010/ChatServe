@@ -49,6 +49,8 @@ builder.Services.AddOptions<UsageOptions>().Bind(builder.Configuration.GetSectio
 builder.Services.AddSingleton<AnthropicClientProvider>(); // new client when the key changes from the dashboard
 builder.Services.AddSingleton<IChatCompletionClient, ClaudeChatCompletionClient>();
 builder.Services.AddSingleton<IChatScreenshotReader, ClaudeChatScreenshotReader>();
+builder.Services.AddOptions<VoiceOptions>().Bind(builder.Configuration.GetSection(VoiceOptions.SectionName));
+builder.Services.AddHttpClient<IVoiceTranscriber, WhisperVoiceTranscriber>(c => c.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddSingleton(TimeProvider.System);
 
 // ---- Orders (Phase 3) ----

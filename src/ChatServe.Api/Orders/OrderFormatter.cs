@@ -10,7 +10,7 @@ public static partial class OrderFormatter
     public static string TotalText(Order o, string currency) => $"{currency} {Money.Format(o.Total)}";
 
     /// <summary>The summary shown to the customer before they confirm.</summary>
-    public static string DraftSummary(Order o, string currency)
+    public static string DraftSummary(Order o, string currency, bool romanUrdu = false)
     {
         var sb = new StringBuilder();
         sb.AppendLine("🧾 *Order summary*");
@@ -29,7 +29,9 @@ public static partial class OrderFormatter
         if (!string.IsNullOrWhiteSpace(o.PaymentMethod)) sb.AppendLine($"Payment: {o.PaymentMethod}");
         if (!string.IsNullOrWhiteSpace(o.Notes)) sb.AppendLine($"Note: {o.Notes}");
         sb.AppendLine();
-        sb.Append("Reply *confirm* (or 1) to place the order. Let us know if you want to change anything.");
+        sb.Append(romanUrdu
+            ? "Sab theek hai to *haan* likh dein, order laga dete hain ✅ Kuch badalna ho to bata dein."
+            : "All good? Reply *yes* and we'll place the order ✅ Or tell us what to change.");
         return sb.ToString();
     }
 

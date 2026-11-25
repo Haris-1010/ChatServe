@@ -112,7 +112,7 @@ public static class RestaurantTools
 /// so the reply generator can act on them after the AI call.
 /// </summary>
 public sealed class OrderToolExecutor(
-    OrderService orders, Restaurant restaurant, Customer customer, DateTimeOffset now) : IToolExecutor
+    OrderService orders, Restaurant restaurant, Customer customer, DateTimeOffset now, bool romanUrdu = false) : IToolExecutor
 {
     public Order? Draft { get; private set; }
     public bool HandedOver { get; private set; }
@@ -149,7 +149,7 @@ public sealed class OrderToolExecutor(
                 return new ToolOutcome(
                     "Draft saved, NOT confirmed yet. Send the customer this summary now. You may translate it to the customer's language, " +
                     "but keep every item, quantity and amount exactly as written:\n\n" +
-                    OrderFormatter.DraftSummary(Draft, restaurant.Currency));
+                    OrderFormatter.DraftSummary(Draft, restaurant.Currency, romanUrdu));
             }
 
             case RestaurantTools.GetOrderStatus:

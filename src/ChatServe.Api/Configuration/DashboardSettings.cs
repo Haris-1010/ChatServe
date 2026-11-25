@@ -65,6 +65,11 @@ public static class SettingsCatalog
         new("Anthropic:MaxToolRounds", "AI (Claude)", "Max tool rounds", SettingKind.Number,
             "How many times the AI can use tools for one message. Default 5."),
 
+        new("Voice:OpenAiApiKey", "Voice notes", "OpenAI API key (Whisper)", SettingKind.Secret,
+            "platform.openai.com > API keys. With a key, customers' voice notes are turned into text and answered. Empty = they get a \"please type\" reply."),
+        new("Voice:Model", "Voice notes", "Speech-to-text model", SettingKind.Text,
+            "Default whisper-1."),
+
         new("Usage:InputUsdPerMillion", "AI cost", "Input price ($ per 1M tokens)", SettingKind.Decimal,
             "From Anthropic's pricing page for the model above. claude-haiku-5-5: 0.10, claude-sonnet-5-5: 2, claude-opus-5-5: 4."),
         new("Usage:OutputUsdPerMillion", "AI cost", "Output price ($ per 1M tokens)", SettingKind.Decimal,
