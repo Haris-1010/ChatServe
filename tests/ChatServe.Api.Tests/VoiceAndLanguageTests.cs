@@ -103,7 +103,7 @@ public class VoiceAndLanguageTests
 
         Assert.Equal(CustomerText.CannotRead(ru: true, voice: true), noKey);
         Assert.Equal(CustomerText.CannotRead(ru: true, voice: true), broken);
-        Assert.Contains("voice message nahi sun sakte", noKey);
+        Assert.Equal("Please text me 🙏", noKey);
         Assert.Empty(ai.Calls);
     }
 
