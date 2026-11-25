@@ -134,11 +134,18 @@ export interface UsageLine {
 }
 export interface UsageClient {
   id: number; name: string; isActive: boolean; monthlyReplyLimit: number | null; remainingReplies: number | null;
+  packageReplies: number | null; extraReplies: number;
   percent: number | null; warning: boolean; overLimit: boolean; usage: UsageLine;
   totalTokens: number; avgTokensPerReply: number; avgCostPkrPerReply: number; sharePercent: number | null;
   repliesPerDay: number; projectedReplies: number;
   daily: { date: string; usage: UsageLine }[];
   restaurants: { id: number; name: string; usage: UsageLine }[];
+}
+export type ReplyRequestKind = 'TopUp' | 'Package';
+export interface ReplyRequest {
+  id: number; organizationId: number; clientName: string; requestedBy: string; replies: number; kind: ReplyRequestKind;
+  note: string | null; status: 'Pending' | 'Approved' | 'Rejected'; approvedReplies: number | null; adminNote: string | null;
+  createdAt: string; decidedAt: string | null;
 }
 export interface UsageCredit {
   balanceUsd: number; setAt: string; spentUsd: number; spentTokens: number; remainingUsd: number; remainingPkr: number;
@@ -193,6 +200,12 @@ export class Api {
   saveRestaurant(rid: number, p: RestaurantProfile) { return this.put<RestaurantProfile>(`/api/restaurants/${rid}`, p); }
   usage(month?: string) { return this.get<UsageReport>('/api/usage', month ? { month } : undefined); }
   setCredit(balanceUsd: number | null) { return this.put<void>('/api/usage/credit', { balanceUsd }); }
+  replyRequests() { return this.get<ReplyRequest[]>('/api/reply-requests'); }
+  requestReplies(replies: number, kind: ReplyRequestKind, note: string) { return this.post<ReplyRequest>('/api/reply-requests', { replies, kind, note }); }
+  withdrawRequest(id: number) { return this.del(`/api/reply-requests/${id}`); }
+  approveRequest(id: number, replies: number, adminNote: string) { return this.post<void>(`/api/reply-requests/${id}/approve`, { replies, adminNote }); }
+  rejectRequest(id: number, adminNote: string) { return this.post<void>(`/api/reply-requests/${id}/reject`, { adminNote }); }
+  topUp(clientId: number, replies: number) { return this.post<void>(`/api/clients/${clientId}/topup`, { replies }); }
   setReplyLimit(clientId: number, monthlyReplyLimit: number | null) { return this.put<{ id: number; monthlyReplyLimit: number | null }>(`/api/clients/${clientId}/limit`, { monthlyReplyLimit }); }
   training(rid: number) { return this.get<Training>(`/api/restaurants/${rid}/training`); }
   saveTraining(rid: number, text: string) { return this.put<Training>(`/api/restaurants/${rid}/training`, { text }); }

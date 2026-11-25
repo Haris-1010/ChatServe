@@ -156,4 +156,55 @@ public class UsageTests
         (await admin.PutAsJsonAsync("/api/usage/credit", new { balanceUsd = (decimal?)null })).EnsureSuccessStatusCode();
         Assert.Equal(JsonValueKind.Null, (await admin.GetFromJsonAsync<JsonElement>("/api/usage")).GetProperty("credit").ValueKind);
     }
+
+    [Fact]
+    public async Task Client_requests_more_replies_and_admin_approves_or_tops_up()
+    {
+        var (factory, admin) = await DashboardApiTests.LoggedInAsync();
+        await using var _ = factory;
+        var created = await (await admin.PostAsJsonAsync("/api/clients", new
+        {
+            name = "Butt Foods", restaurantName = "Butt Karahi", whatsAppPhoneNumberId = "800002", username = "butt2", password = Pass,
+        })).Content.ReadFromJsonAsync<JsonElement>();
+        var oid = created.GetProperty("id").GetInt32();
+        var rid = created.GetProperty("restaurantId").GetInt32();
+        (await admin.PutAsJsonAsync($"/api/clients/{oid}/limit", new { monthlyReplyLimit = 100 })).EnsureSuccessStatusCode();
+
+        var owner = factory.CreateClient();
+        var login = await owner.PostAsJsonAsync("/api/auth/login", new { username = "butt2", password = Pass });
+        owner.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            (await login.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("accessToken").GetString());
+
+        // A top-up for this month: one open request at a time
+        (await owner.PostAsJsonAsync("/api/reply-requests", new { replies = 50, kind = "TopUp", note = "Eid rush" })).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.BadRequest, (await owner.PostAsJsonAsync("/api/reply-requests", new { replies = 10, kind = "TopUp" })).StatusCode);
+        var pending = (await admin.GetFromJsonAsync<JsonElement>("/api/reply-requests")).EnumerateArray().Single();
+        Assert.Equal("Pending", pending.GetProperty("status").GetString());
+        Assert.Equal("Butt Foods", pending.GetProperty("clientName").GetString());
+        var reqId = pending.GetProperty("id").GetInt32();
+
+        // Owners can't approve their own request
+        Assert.Equal(HttpStatusCode.Forbidden, (await owner.PostAsJsonAsync($"/api/reply-requests/{reqId}/approve", new { })).StatusCode);
+
+        // The admin approves 40 instead of 50: 100 package + 40 this month
+        (await admin.PostAsJsonAsync($"/api/reply-requests/{reqId}/approve", new { replies = 40, adminNote = "40 for now" })).EnsureSuccessStatusCode();
+        var mine = Assert.Single((await owner.GetFromJsonAsync<JsonElement>("/api/usage")).GetProperty("clients").EnumerateArray());
+        Assert.Equal(140, mine.GetProperty("monthlyReplyLimit").GetInt32());
+        Assert.Equal(100, mine.GetProperty("packageReplies").GetInt32());
+        Assert.Equal(40, mine.GetProperty("extraReplies").GetInt32());
+        Assert.Equal(140, (await owner.GetFromJsonAsync<JsonElement>($"/api/restaurants/{rid}/overview")).GetProperty("monthlyReplyLimit").GetInt32());
+        var answered = (await owner.GetFromJsonAsync<JsonElement>("/api/reply-requests")).EnumerateArray().Single();
+        Assert.Equal("Approved", answered.GetProperty("status").GetString());
+        Assert.Equal(40, answered.GetProperty("approvedReplies").GetInt32());
+
+        // A bigger package, rejected; then the admin adds replies directly (and takes some back)
+        (await owner.PostAsJsonAsync("/api/reply-requests", new { replies = 500, kind = "Package" })).EnsureSuccessStatusCode();
+        var pkgId = (await admin.GetFromJsonAsync<JsonElement>("/api/reply-requests")).EnumerateArray().First().GetProperty("id").GetInt32();
+        (await admin.PostAsJsonAsync($"/api/reply-requests/{pkgId}/reject", new { adminNote = "Talk to us first" })).EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync($"/api/clients/{oid}/topup", new { replies = 100 })).EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync($"/api/clients/{oid}/topup", new { replies = -500 })).EnsureSuccessStatusCode(); // never below 0
+        mine = Assert.Single((await owner.GetFromJsonAsync<JsonElement>("/api/usage")).GetProperty("clients").EnumerateArray());
+        Assert.Equal(100, mine.GetProperty("monthlyReplyLimit").GetInt32());
+        Assert.Equal(HttpStatusCode.Forbidden, (await owner.PostAsJsonAsync($"/api/clients/{oid}/topup", new { replies = 1000 })).StatusCode);
+    }
 }

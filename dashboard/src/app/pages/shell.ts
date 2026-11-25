@@ -9,8 +9,11 @@ import { errorText, Toasts } from '../core/toast';
   selector: 'app-shell',
   imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule],
   styles: [`
-    .usage-banner { display: block; margin-bottom: 14px; padding: 10px 14px; border-radius: 10px; text-decoration: none;
-      background: rgba(245, 166, 35, .14); border: 1px solid rgba(245, 166, 35, .45); color: inherit; font-size: 14px; }
+    .usage-banner { display: flex; gap: 10px; align-items: center; padding: 12px 16px; border-radius: 14px; text-decoration: none;
+      background: var(--warn-soft); border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent); color: var(--text); font-size: 14px;
+      transition: box-shadow .2s; }
+    .usage-banner:hover { text-decoration: none; box-shadow: var(--shadow-hover); }
+    .usage-banner.info { background: var(--info-soft); border-color: color-mix(in srgb, var(--info) 25%, transparent); }
   `],
   template: `
     <div class="layout" [class.nav-open]="navOpen()">
@@ -21,7 +24,8 @@ import { errorText, Toasts } from '../core/toast';
           @if (auth.isAdmin()) {
             <div class="nav-label">Admin</div>
             <a routerLink="/clients" routerLinkActive="active"><span>🏢</span> All clients</a>
-            <a routerLink="/usage" routerLinkActive="active"><span>📊</span> AI usage</a>
+            <a routerLink="/usage" routerLinkActive="active"><span>📊</span> AI usage
+              @if (pendingRequests() > 0) { <span class="nav-count" title="Reply requests waiting">{{ pendingRequests() }}</span> }</a>
             <a routerLink="/settings" routerLinkActive="active"><span>⚙️</span> Settings</a>
           }
         </nav>
@@ -69,11 +73,14 @@ import { errorText, Toasts } from '../core/toast';
         </nav>
         }
 
-        @if (auth.me(); as m) {
-          <div class="muted small signed-in">Signed in as <b>{{ m.username }}</b>
-            {{ m.role === 'admin' ? '(admin: sees all clients)' : m.organizationName ? '· ' + m.organizationName : '' }}</div>
-        }
-        <button class="btn ghost block logout" (click)="logout()">Logout</button>
+        <div class="sidebar-foot">
+          @if (auth.me(); as m) {
+            <div class="muted small signed-in">Signed in as <b>{{ m.username }}</b>
+              {{ m.role === 'admin' ? '(admin: sees all clients)' : m.organizationName ? '· ' + m.organizationName : '' }}</div>
+          }
+          <button class="btn ghost sm theme-toggle" (click)="toggleTheme()">{{ dark() ? '☀️ Light mode' : '🌙 Dark mode' }}</button>
+          <button class="btn ghost block logout" (click)="logout()">Logout</button>
+        </div>
       </aside>
 
       <div class="main">
@@ -91,6 +98,9 @@ import { errorText, Toasts } from '../core/toast';
           }
         </header>
         <main class="content">
+          @if (pendingRequests() > 0) {
+            <a class="usage-banner info" routerLink="/usage">📩 {{ pendingRequests() }} {{ pendingRequests() === 1 ? 'client is' : 'clients are' }} asking for more AI replies. Open AI usage to approve.</a>
+          }
           @if (usageWarning(); as w) {
             <a class="usage-banner" routerLink="/usage">⚠️ {{ w }}</a>
           }
@@ -117,6 +127,16 @@ export class Shell implements OnInit {
   navOpen = signal(false);
   loaded = signal(false);
   usageWarning = signal('');
+  pendingRequests = signal(0);
+  dark = signal(document.documentElement.dataset['theme'] === 'dark');
+
+  toggleTheme() {
+    const dark = !this.dark();
+    this.dark.set(dark);
+    if (dark) document.documentElement.dataset['theme'] = 'dark';
+    else delete document.documentElement.dataset['theme'];
+    try { localStorage.setItem('chatserve.theme', dark ? 'dark' : 'light'); } catch { /* ignore */ }
+  }
 
   async ngOnInit() {
     try {
@@ -137,6 +157,9 @@ export class Shell implements OnInit {
 
   /** A banner when a client is near or over its monthly AI limit (only a warning; the bot keeps working). */
   private async checkUsage() {
+    if (this.auth.isAdmin()) {
+      this.api.replyRequests().then(r => this.pendingRequests.set(r.filter(x => x.status === 'Pending').length)).catch(() => { /* optional */ });
+    }
     try {
       const u = await this.api.usage();
       const near = u.clients.filter(c => c.warning);

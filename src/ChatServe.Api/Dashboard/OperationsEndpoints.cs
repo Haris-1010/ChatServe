@@ -38,8 +38,9 @@ public static class OperationsEndpoints
 
             // The client's AI replies this month (all its restaurants) against its package
             var orgId = await db.Restaurants.Where(r => r.Id == rid).Select(r => r.OrganizationId).FirstAsync(ct);
-            var limit = await db.Organizations.Where(o => o.Id == orgId).Select(o => o.MonthlyReplyLimit).FirstAsync(ct);
-            var (_, monthFrom, monthTo) = Ai.UsageAlerts.Month(now);
+            var org = await db.Organizations.AsNoTracking().FirstAsync(o => o.Id == orgId, ct);
+            var (monthKey, monthFrom, monthTo) = Ai.UsageAlerts.Month(now);
+            var limit = org.ReplyLimitFor(monthKey);
             var repliesThisMonth = await db.ChatMessages.CountAsync(m =>
                 db.Restaurants.Any(r => r.Id == m.RestaurantId && r.OrganizationId == orgId) &&
                 m.Role == ChatRole.Bot && m.InputTokens != null && m.CreatedAt >= monthFrom && m.CreatedAt < monthTo, ct);

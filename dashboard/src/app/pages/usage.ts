@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Api, UsageClient, UsageLine, UsageReport } from '../core/api';
+import { Api, ReplyRequest, ReplyRequestKind, UsageClient, UsageLine, UsageReport } from '../core/api';
 import { Auth } from '../core/auth';
 import { errorText, Toasts } from '../core/toast';
 
@@ -18,17 +18,41 @@ import { errorText, Toasts } from '../core/toast';
       @if (r.showCost) {
         <!-- ===== Admin: totals, credit, all clients side by side ===== -->
         <div class="stats">
-          <div class="stat"><div class="stat-label">All clients, {{ monthName(r.month) }}</div>
+          <div class="stat"><div class="stat-top"><span class="stat-icon">💰</span><div class="stat-label">AI cost, {{ monthName(r.month) }}</div></div>
             <div class="stat-value">Rs {{ r.total.costPkr | number:'1.0-0' }}</div>
-            <div class="stat-sub">$ {{ r.total.costUsd | number:'1.2-4' }} · {{ r.total.replies | number }} AI replies</div></div>
-          <div class="stat"><div class="stat-label">Tokens used</div>
-            <div class="stat-value small-value">{{ tokens(r.total) | number }}</div>
+            <div class="stat-sub">$ {{ r.total.costUsd | number:'1.2-4' }} · all clients</div></div>
+          <div class="stat"><div class="stat-top"><span class="stat-icon blue">💬</span><div class="stat-label">AI replies</div></div>
+            <div class="stat-value">{{ r.total.replies | number }}</div>
+            <div class="stat-sub">{{ r.clients.length }} {{ r.clients.length === 1 ? 'client' : 'clients' }}</div></div>
+          <div class="stat"><div class="stat-top"><span class="stat-icon violet">🔢</span><div class="stat-label">Tokens used</div></div>
+            <div class="stat-value">{{ tokens(r.total) | number }}</div>
             <div class="stat-sub">{{ r.total.inputTokens | number }} in · {{ r.total.outputTokens | number }} out ·
               {{ r.total.cacheReadTokens + r.total.cacheWriteTokens | number }} cache</div></div>
-          <div class="stat"><div class="stat-label">Average per reply</div>
-            <div class="stat-value small-value">{{ r.total.replies ? (tokens(r.total) / r.total.replies | number:'1.0-0') : '—' }} tokens</div>
-            <div class="stat-sub">Rs {{ r.total.replies ? (r.total.costPkr / r.total.replies | number:'1.2-2') : '—' }} per reply</div></div>
+          <div class="stat"><div class="stat-top"><span class="stat-icon amber">⚖️</span><div class="stat-label">Average per reply</div></div>
+            <div class="stat-value">{{ r.total.replies ? (tokens(r.total) / r.total.replies | number:'1.0-0') : '—' }}</div>
+            <div class="stat-sub">tokens · Rs {{ r.total.replies ? (r.total.costPkr / r.total.replies | number:'1.2-2') : '—' }} per reply</div></div>
         </div>
+
+        @if (pending().length) {
+          <section class="card requests">
+            <div class="card-head"><h2>📩 Reply requests</h2><span class="pill warn">{{ pending().length }} waiting</span></div>
+            @for (q of pending(); track q.id) {
+              <div class="request">
+                <div class="request-main">
+                  <div><b>{{ q.clientName }}</b> asks for <b>{{ q.replies | number }}</b> more replies
+                    <span class="pill" [class.ok]="q.kind === 'Package'">{{ q.kind === 'TopUp' ? 'This month only' : 'Every month' }}</span></div>
+                  <div class="muted small">{{ q.createdAt | date:'d MMM, h:mm a' }} · by {{ q.requestedBy }}@if (q.note) { · "{{ q.note }}" }</div>
+                </div>
+                <div class="request-actions">
+                  <input type="number" min="1" class="w-num" [(ngModel)]="approveAmount[q.id]" [name]="'a' + q.id" title="Replies to give" />
+                  <input class="w-note" [(ngModel)]="adminNote[q.id]" [name]="'n' + q.id" placeholder="Note to client (optional)" />
+                  <button class="btn primary sm" (click)="approve(q)" [disabled]="busy()">Approve</button>
+                  <button class="btn danger-ghost sm" (click)="reject(q)" [disabled]="busy()">Reject</button>
+                </div>
+              </div>
+            }
+          </section>
+        }
 
         <div class="card credit" [class.warn]="r.credit && r.credit.percent <= 20" [class.over]="r.credit && r.credit.remainingUsd <= 0">
           <h2>Anthropic credit left</h2>
@@ -118,6 +142,9 @@ import { errorText, Toasts } from '../core/toast';
           </div>
 
           @if (c.monthlyReplyLimit) {
+            @if (c.extraReplies) {
+              <div class="small muted">Package {{ c.packageReplies | number }} + {{ c.extraReplies | number }} extra this month</div>
+            }
             <div class="bar"><div [style.width.%]="min(c.percent ?? 0, 100)"></div></div>
             <div class="small">
               {{ c.percent }}% used
@@ -174,11 +201,75 @@ import { errorText, Toasts } from '../core/toast';
           }
 
           @if (auth.isAdmin()) {
-            <form class="budget" (ngSubmit)="saveBudget(c)">
-              <label class="field"><span>AI replies per month (package)</span>
-                <input type="number" min="0" step="100" name="b{{ c.id }}" [(ngModel)]="budgets[c.id]" placeholder="e.g. 3000 (empty = no limit)" /></label>
-              <button class="btn" [disabled]="busy()">Save limit</button>
-            </form>
+            <div class="limits">
+              <div class="limit-box">
+                <div class="limit-title">Package (every month)</div>
+                <div class="stepper">
+                  <button class="btn ghost sm" type="button" (click)="step(c, -500)">−500</button>
+                  <button class="btn ghost sm" type="button" (click)="step(c, -100)">−100</button>
+                  <input type="number" min="0" step="100" [name]="'b' + c.id" [(ngModel)]="budgets[c.id]" placeholder="No limit" />
+                  <button class="btn ghost sm" type="button" (click)="step(c, 100)">+100</button>
+                  <button class="btn ghost sm" type="button" (click)="step(c, 500)">+500</button>
+                </div>
+                <button class="btn primary sm" type="button" (click)="saveBudget(c)" [disabled]="busy()">Save package</button>
+                <div class="muted small">Empty = no limit. Changes every month from now on.</div>
+              </div>
+              <div class="limit-box">
+                <div class="limit-title">Extra for this month only</div>
+                <div class="stepper">
+                  @for (n of [100, 500, 1000]; track n) {
+                    <button class="btn ghost sm" type="button" (click)="topUp(c, n)" [disabled]="busy() || !c.packageReplies">+{{ n | number }}</button>
+                  }
+                  <button class="btn ghost sm" type="button" (click)="topUp(c, -100)" [disabled]="busy() || !c.extraReplies">−100</button>
+                </div>
+                <div class="muted small">{{ c.extraReplies ? (c.extraReplies | number) + ' extra this month.' : 'None this month.' }} Resets next month.</div>
+              </div>
+            </div>
+          } @else {
+            <!-- Client: ask for more replies -->
+            @if (myPending(); as q) {
+              <div class="ask waiting">
+                ⏳ You asked for <b>{{ q.replies | number }}</b> more replies ({{ q.kind === 'TopUp' ? 'this month' : 'every month' }}) on {{ q.createdAt | date:'d MMM' }}.
+                Waiting for approval.
+                <button class="link small" type="button" (click)="withdraw(q)">Withdraw</button>
+              </div>
+            } @else if (asking()) {
+              <form class="ask" (ngSubmit)="sendRequest()">
+                <div class="limit-title">How many more replies do you need?</div>
+                <div class="chips">
+                  @for (n of [250, 500, 1000, 2000]; track n) {
+                    <button type="button" class="chip" [class.on]="askReplies === n" (click)="askReplies = n">{{ n | number }}</button>
+                  }
+                  <input type="number" min="1" class="w-num" name="askN" [(ngModel)]="askReplies" />
+                </div>
+                <div class="chips">
+                  <button type="button" class="chip" [class.on]="askKind === 'TopUp'" (click)="askKind = 'TopUp'">Only this month</button>
+                  <button type="button" class="chip" [class.on]="askKind === 'Package'" (click)="askKind = 'Package'">Every month (bigger package)</button>
+                </div>
+                <input name="askNote" [(ngModel)]="askNote" placeholder="Note (optional), e.g. Eid rush" maxlength="500" />
+                <div class="row">
+                  <button class="btn primary" [disabled]="busy() || !askReplies">Send request</button>
+                  <button class="btn ghost" type="button" (click)="asking.set(false)">Cancel</button>
+                </div>
+              </form>
+            } @else {
+              <div class="row">
+                <button class="btn primary" type="button" (click)="asking.set(true)">＋ Request more replies</button>
+                <span class="muted small">We'll review it and you'll see the answer here.</span>
+              </div>
+            }
+            @if (myHistory().length) {
+              <div class="history">
+                @for (q of myHistory(); track q.id) {
+                  <div class="small">
+                    <span class="pill" [class.ok]="q.status === 'Approved'" [class.warn]="q.status === 'Rejected'">{{ q.status }}</span>
+                    {{ q.replies | number }} replies ({{ q.kind === 'TopUp' ? 'this month' : 'every month' }}), {{ q.createdAt | date:'d MMM' }}
+                    @if (q.status === 'Approved' && q.approvedReplies !== q.replies) { · {{ q.approvedReplies | number }} given }
+                    @if (q.adminNote) { · <span class="muted">"{{ q.adminNote }}"</span> }
+                  </div>
+                }
+              </div>
+            }
           }
         </div>
       } @empty {
@@ -195,7 +286,7 @@ import { errorText, Toasts } from '../core/toast';
   styles: [`
     .page-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
     .page-head input { width: auto; }
-    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 8px; }
+
     .credit { margin: 6px 0 8px; display: flex; flex-direction: column; gap: 10px; }
     .credit h2, .compare h2 { margin: 0; font-size: 18px; }
     .compare h2 { padding: 14px 16px 6px; }
@@ -209,7 +300,27 @@ import { errorText, Toasts } from '../core/toast';
     .credit.over { border-color: rgba(229, 72, 77, .7); }
     .credit.over .bar div { background: #e5484d; }
     .credit-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-    .client { margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .client { margin-bottom: 14px; display: flex; flex-direction: column; gap: 12px; }
+    .requests { display: flex; flex-direction: column; gap: 4px; }
+    .request { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; padding: 12px 0; border-top: 1px solid var(--border); }
+    .request-main { flex: 1 1 280px; display: flex; flex-direction: column; gap: 2px; }
+    .request-main .pill { margin-left: 6px; }
+    .request-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .w-num { width: 100px; }
+    .w-note { width: 200px; }
+    .limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+    .limit-box { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 14px; border-radius: 12px;
+      background: var(--surface-2); border: 1px solid var(--border); }
+    .limit-title { font-weight: 600; font-size: 13px; }
+    .stepper { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .stepper input { width: 110px; text-align: center; }
+    .ask { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+    .ask.waiting { display: block; background: var(--info-soft); border-color: transparent; }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .chip { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; transition: .15s; }
+    .chip:hover { border-color: var(--primary); }
+    .chip.on { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-strong); font-weight: 600; }
+    .history { display: flex; flex-direction: column; gap: 6px; }
     .client.warn { border-color: rgba(245, 166, 35, .6); }
     .client.over { border-color: rgba(229, 72, 77, .7); }
     .client h2 { margin: 0 0 2px; font-size: 18px; }
@@ -217,7 +328,8 @@ import { errorText, Toasts } from '../core/toast';
     .cost { text-align: right; }
     .big { font-size: 22px; font-weight: 700; }
     .big .of { font-size: 14px; font-weight: 500; opacity: .7; }
-    .bar { height: 8px; border-radius: 6px; background: rgba(127,127,127,.2); overflow: hidden; }
+    .bar { height: 10px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+    .bar div { transition: width .4s ease; border-radius: 6px; }
     .bar div { height: 100%; background: var(--primary); }
     .client.warn .bar div { background: #f5a623; }
     .client.over .bar div { background: #e5484d; }
@@ -247,15 +359,64 @@ export class UsagePage implements OnInit {
   open = signal<number | null>(null);
   budgets: Record<number, number | null> = {};
   creditInput: number | null = null;
+  requests = signal<ReplyRequest[]>([]);
+  pending = signal<ReplyRequest[]>([]);
+  approveAmount: Record<number, number> = {};
+  adminNote: Record<number, string> = {};
+  asking = signal(false);
+  askReplies = 500;
+  askKind: ReplyRequestKind = 'TopUp';
+  askNote = '';
 
-  ngOnInit() { this.load(); }
+  myPending() { return this.requests().find(q => q.status === 'Pending') ?? null; }
+  myHistory() { return this.requests().filter(q => q.status !== 'Pending').slice(0, 5); }
+
+  async loadRequests() {
+    try {
+      const list = await this.api.replyRequests();
+      this.requests.set(list);
+      const p = list.filter(q => q.status === 'Pending');
+      this.pending.set(this.auth.isAdmin() ? p : []);
+      for (const q of p) { this.approveAmount[q.id] ??= q.replies; }
+    } catch (e) { this.toasts.error(errorText(e)); }
+  }
+
+  private async run(action: () => Promise<unknown>, ok: string) {
+    this.busy.set(true);
+    try {
+      await action();
+      this.toasts.ok(ok);
+      await Promise.all([this.load(this.month()), this.loadRequests()]);
+    } catch (e) {
+      this.toasts.error(errorText(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  sendRequest() {
+    return this.run(() => this.api.requestReplies(Math.round(+this.askReplies), this.askKind, this.askNote), 'Request sent.')
+      .then(() => { this.asking.set(false); this.askNote = ''; });
+  }
+  withdraw(q: ReplyRequest) { return this.run(() => this.api.withdrawRequest(q.id), 'Request withdrawn.'); }
+  approve(q: ReplyRequest) {
+    const n = Math.round(+this.approveAmount[q.id] || q.replies);
+    return this.run(() => this.api.approveRequest(q.id, n, this.adminNote[q.id] ?? ''), `Approved ${n.toLocaleString()} replies for ${q.clientName}.`);
+  }
+  reject(q: ReplyRequest) { return this.run(() => this.api.rejectRequest(q.id, this.adminNote[q.id] ?? ''), 'Request rejected.'); }
+  topUp(c: UsageClient, n: number) {
+    return this.run(() => this.api.topUp(c.id, n), n > 0 ? `Added ${n.toLocaleString()} replies for this month.` : `Removed ${(-n).toLocaleString()} extra replies.`);
+  }
+  step(c: UsageClient, n: number) { this.budgets[c.id] = Math.max(0, (+(this.budgets[c.id] ?? 0) || 0) + n); }
+
+  ngOnInit() { this.load(); this.loadRequests(); }
 
   async load(month?: string) {
     try {
       const r = await this.api.usage(month);
       this.report.set(r);
       this.month.set(r.month);
-      this.budgets = Object.fromEntries(r.clients.map(c => [c.id, c.monthlyReplyLimit]));
+      this.budgets = Object.fromEntries(r.clients.map(c => [c.id, c.packageReplies]));
     } catch (e) { this.toasts.error(errorText(e)); }
   }
 

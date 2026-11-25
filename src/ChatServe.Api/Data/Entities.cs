@@ -21,7 +21,44 @@ public sealed class Organization
     public string? UsageAlertMonth { get; set; }
     public int UsageAlertLevel { get; set; }
 
+    /// <summary>Extra AI replies for one month only (an approved top-up): <see cref="ExtraRepliesMonth"/> is "2026-11".</summary>
+    public int ExtraReplies { get; set; }
+    public string? ExtraRepliesMonth { get; set; }
+
+    /// <summary>The replies allowed in a month: the package plus that month's top-up. Null = no limit.</summary>
+    public int? ReplyLimitFor(string month) =>
+        MonthlyReplyLimit is { } l ? l + (ExtraRepliesMonth == month ? ExtraReplies : 0) : null;
+
+    /// <summary>This month's top-up (0 if none).</summary>
+    public int ExtraFor(string month) => ExtraRepliesMonth == month ? ExtraReplies : 0;
+
     public List<Restaurant> Restaurants { get; set; } = [];
+}
+
+public enum ReplyRequestKind
+{
+    /// <summary>Extra replies for the current month only.</summary>
+    TopUp = 0,
+    /// <summary>A bigger monthly package from now on.</summary>
+    Package = 1,
+}
+
+public enum ReplyRequestStatus { Pending = 0, Approved = 1, Rejected = 2 }
+
+/// <summary>A client asking for more AI replies. The admin approves (maybe with another amount) or rejects it.</summary>
+public sealed class ReplyRequest
+{
+    public int Id { get; set; }
+    public int OrganizationId { get; set; }
+    public required string RequestedBy { get; set; }      // the owner's username
+    public int Replies { get; set; }                      // how many more replies they ask for
+    public ReplyRequestKind Kind { get; set; }
+    public string? Note { get; set; }
+    public ReplyRequestStatus Status { get; set; }
+    public int? ApprovedReplies { get; set; }
+    public string? AdminNote { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? DecidedAt { get; set; }
 }
 
 public sealed class Restaurant

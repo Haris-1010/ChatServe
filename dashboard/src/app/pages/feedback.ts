@@ -23,13 +23,13 @@ import { errorText, Toasts } from '../core/toast';
 
     @if (report(); as r) {
       <div class="stats">
-        <div class="stat"><div class="stat-label">Average rating</div>
-          <div class="stat-value">{{ r.average != null ? '⭐ ' + r.average : '—' }}</div>
+        <div class="stat"><div class="stat-top"><span class="stat-icon amber">⭐</span><div class="stat-label">Average rating</div></div>
+          <div class="stat-value">{{ r.average != null ? r.average + ' / 5' : '—' }}</div>
           <div class="stat-sub">{{ r.count }} {{ r.count === 1 ? 'rating' : 'ratings' }} · {{ r.withComment }} with a comment</div></div>
-        <div class="stat"><div class="stat-label">Customers said "received"</div>
+        <div class="stat"><div class="stat-top"><span class="stat-icon">📦</span><div class="stat-label">Customers said "received"</div></div>
           <div class="stat-value">{{ r.received }}</div>
           <div class="stat-sub">{{ r.deliveredOrders }} {{ r.deliveredOrders === 1 ? 'delivery' : 'deliveries' }} completed</div></div>
-        <div class="stat dist">
+        <div class="stat dist"><div class="stat-top"><span class="stat-icon violet">📊</span><div class="stat-label">Ratings</div></div>
           @for (s of r.stars; track s.stars) {
             <div class="dist-row">
               <span class="dist-label">{{ s.stars }} ⭐</span>
@@ -67,10 +67,10 @@ import { errorText, Toasts } from '../core/toast';
   styles: [`
     .page-head .row select { width: auto; }
     .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 14px; }
-    .dist { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+    .dist { gap: 4px; }
     .dist-row { display: grid; grid-template-columns: 40px 1fr 32px; align-items: center; gap: 8px; font-size: 13px; }
     .dist-count { text-align: right; opacity: .8; }
-    .bar { height: 8px; border-radius: 6px; background: rgba(127,127,127,.2); overflow: hidden; }
+    .bar { height: 8px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
     .bar div { height: 100%; background: #f5a623; }
     .bar div.low { background: #e5484d; }
     .stars { white-space: nowrap; letter-spacing: 1px; }

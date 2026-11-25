@@ -8,12 +8,6 @@ import { errorText, Toasts } from '../core/toast';
 @Component({
   selector: 'app-overview',
   imports: [RouterLink],
-  styles: [`
-    .mini-bar { height: 6px; border-radius: 4px; background: rgba(127,127,127,.2); overflow: hidden; margin-top: 8px; }
-    .mini-bar div { height: 100%; background: var(--primary); }
-    .warn-stat { border-color: rgba(245, 166, 35, .7) !important; }
-    .warn-stat .mini-bar div { background: #f5a623; }
-  `],
   template: `
     <div class="page-head">
       <h1>Home</h1>
@@ -22,19 +16,23 @@ import { errorText, Toasts } from '../core/toast';
 
     @if (stats(); as s) {
       <div class="stats">
-        <div class="stat"><div class="stat-label">Orders today</div><div class="stat-value">{{ s.ordersToday }}</div></div>
-        <div class="stat"><div class="stat-label">Sales today</div><div class="stat-value">{{ money(s.revenueToday) }}</div></div>
-        <a class="stat link" routerLink="/orders"><div class="stat-label">Active orders</div><div class="stat-value">{{ s.activeOrders }}</div>
-          <div class="stat-sub">{{ s.awaitingConfirmation }} awaiting confirmation</div></a>
-        <a class="stat link" routerLink="/chats"><div class="stat-label">Chats today</div><div class="stat-value">{{ s.chatsToday }}</div>
-          <div class="stat-sub">{{ s.botRepliesToday }} bot replies · {{ s.pausedChats }} with staff</div></a>
-        <a class="stat link" routerLink="/bookings"><div class="stat-label">Upcoming bookings</div><div class="stat-value">{{ s.upcomingBookings }}</div></a>
-        <a class="stat link" routerLink="/customers"><div class="stat-label">Customers</div><div class="stat-value">{{ s.customers }}</div></a>
-        <a class="stat link" routerLink="/feedback"><div class="stat-label">Rating (30 days)</div>
-          <div class="stat-value">{{ s.averageRating30Days != null ? '⭐ ' + s.averageRating30Days : '—' }}</div>
+        <div class="stat"><div class="stat-top"><span class="stat-icon">🧾</span><div class="stat-label">Orders today</div></div>
+          <div class="stat-value">{{ s.ordersToday }}</div><div class="stat-sub">confirmed orders</div></div>
+        <div class="stat"><div class="stat-top"><span class="stat-icon">💵</span><div class="stat-label">Sales today</div></div>
+          <div class="stat-value">{{ money(s.revenueToday) }}</div><div class="stat-sub">from today's orders</div></div>
+        <a class="stat link" routerLink="/orders"><div class="stat-top"><span class="stat-icon blue">🔥</span><div class="stat-label">Active orders</div></div>
+          <div class="stat-value">{{ s.activeOrders }}</div><div class="stat-sub">{{ s.awaitingConfirmation }} awaiting confirmation</div></a>
+        <a class="stat link" routerLink="/chats"><div class="stat-top"><span class="stat-icon blue">💬</span><div class="stat-label">Chats today</div></div>
+          <div class="stat-value">{{ s.chatsToday }}</div><div class="stat-sub">{{ s.botRepliesToday }} bot replies · {{ s.pausedChats }} with staff</div></a>
+        <a class="stat link" routerLink="/bookings"><div class="stat-top"><span class="stat-icon violet">📅</span><div class="stat-label">Upcoming bookings</div></div>
+          <div class="stat-value">{{ s.upcomingBookings }}</div><div class="stat-sub">table bookings</div></a>
+        <a class="stat link" routerLink="/customers"><div class="stat-top"><span class="stat-icon violet">👥</span><div class="stat-label">Customers</div></div>
+          <div class="stat-value">{{ s.customers }}</div><div class="stat-sub">all time</div></a>
+        <a class="stat link" routerLink="/feedback"><div class="stat-top"><span class="stat-icon amber">⭐</span><div class="stat-label">Rating (30 days)</div></div>
+          <div class="stat-value">{{ s.averageRating30Days != null ? s.averageRating30Days + ' / 5' : '—' }}</div>
           <div class="stat-sub">{{ s.ratingCount30Days }} {{ s.ratingCount30Days === 1 ? 'rating' : 'ratings' }}</div></a>
         <a class="stat link" routerLink="/usage" [class.warn-stat]="s.monthlyReplyLimit && s.repliesLeft! <= s.monthlyReplyLimit * 0.2">
-          <div class="stat-label">AI replies left this month</div>
+          <div class="stat-top"><span class="stat-icon">🤖</span><div class="stat-label">AI replies left this month</div></div>
           @if (s.monthlyReplyLimit) {
             <div class="stat-value">{{ s.repliesLeft!.toLocaleString() }}</div>
             <div class="stat-sub">{{ s.repliesThisMonth.toLocaleString() }} of {{ s.monthlyReplyLimit.toLocaleString() }} used</div>
@@ -46,14 +44,16 @@ import { errorText, Toasts } from '../core/toast';
         </a>
         @if (auth.isAdmin() && credit(); as cr) {
         <a class="stat link" routerLink="/usage" [class.warn-stat]="cr.percent <= 20">
-          <div class="stat-label">Anthropic credit left (all clients)</div>
-          <div class="stat-value small-value">{{ cr.tokensLeft != null ? cr.tokensLeft.toLocaleString() + ' tokens' : '$ ' + cr.remainingUsd.toFixed(2) }}</div>
-          <div class="stat-sub">$ {{ cr.remainingUsd.toFixed(2) }} of $ {{ cr.balanceUsd.toFixed(2) }}@if (cr.repliesLeft != null) { · ~{{ cr.repliesLeft.toLocaleString() }} replies }</div>
+          <div class="stat-top"><span class="stat-icon amber">🪙</span><div class="stat-label">Anthropic credit left</div></div>
+          <div class="stat-value">{{ cr.tokensLeft != null ? compact(cr.tokensLeft) : '$ ' + cr.remainingUsd.toFixed(2) }}</div>
+          <div class="stat-sub">tokens · $ {{ cr.remainingUsd.toFixed(2) }} of $ {{ cr.balanceUsd.toFixed(2) }}@if (cr.repliesLeft != null) { · ~{{ cr.repliesLeft.toLocaleString() }} replies }</div>
+          <div class="mini-bar"><div [style.width.%]="cr.percent"></div></div>
         </a>
         }
         @if (auth.isAdmin()) {
-        <div class="stat"><div class="stat-label">AI tokens today</div><div class="stat-value small-value">{{ s.inputTokensToday.toLocaleString() }} in</div>
-          <div class="stat-sub">{{ s.outputTokensToday.toLocaleString() }} out</div></div>
+        <div class="stat"><div class="stat-top"><span class="stat-icon violet">🔢</span><div class="stat-label">AI tokens today</div></div>
+          <div class="stat-value">{{ compact(s.inputTokensToday + s.outputTokensToday) }}</div>
+          <div class="stat-sub">{{ s.inputTokensToday.toLocaleString() }} in · {{ s.outputTokensToday.toLocaleString() }} out</div></div>
         }
       </div>
     }
@@ -138,6 +138,9 @@ export class OverviewPage {
     if (id) this.load(id);
     this.loadStatus();
   }
+
+  /** 80,387,276 → "80.4M" */
+  compact(n: number) { return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(n); }
 
   pct(a: number, b: number) { return Math.min(100, b ? a * 100 / b : 0); }
 

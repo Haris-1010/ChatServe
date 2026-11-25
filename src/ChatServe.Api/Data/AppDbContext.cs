@@ -20,6 +20,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<DashboardUser> DashboardUsers => Set<DashboardUser>();
     public DbSet<AiUsageLog> AiUsageLogs => Set<AiUsageLog>();
+    public DbSet<ReplyRequest> ReplyRequests => Set<ReplyRequest>();
     /// <summary>Login-token keys, kept in the DB so logins survive redeploys (Railway starts a fresh container each time).</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -29,6 +30,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.UsageAlertMonth).HasMaxLength(7);
+            e.Property(x => x.ExtraRepliesMonth).HasMaxLength(7);
+        });
+
+        b.Entity<ReplyRequest>(e =>
+        {
+            e.HasIndex(x => new { x.OrganizationId, x.CreatedAt });
+            e.HasIndex(x => x.Status);
+            e.Property(x => x.RequestedBy).HasMaxLength(100);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.Property(x => x.AdminNote).HasMaxLength(500);
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(15);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(15);
+            e.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<AiUsageLog>(e =>

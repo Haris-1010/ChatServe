@@ -22,11 +22,10 @@ public sealed class UsageAlerts(
     public async Task CheckAsync(int organizationId, CancellationToken ct)
     {
         var org = await db.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId, ct);
-        if (org?.MonthlyReplyLimit is not > 0)
-            return;
-        var limit = org.MonthlyReplyLimit.Value;
-
         var (month, from, to) = Month(clock.GetUtcNow());
+        if (org is null || org.ReplyLimitFor(month) is not { } limit || limit <= 0)
+            return;
+
         var rids = await db.Restaurants.Where(r => r.OrganizationId == organizationId).Select(r => r.Id).ToListAsync(ct);
         var replies = await db.ChatMessages.CountAsync(m =>
             rids.Contains(m.RestaurantId) && m.Role == ChatRole.Bot && m.InputTokens != null && m.CreatedAt >= from && m.CreatedAt < to, ct);
@@ -52,17 +51,23 @@ public sealed class UsageAlerts(
             : $"⚠️ *ChatServe:* {org.Name} has used {replies * 100 / limit}% of this month's AI replies ({replies:N0} of {limit:N0}). Dashboard → AI usage.";
         logger.LogInformation("Usage alert for {Client}: {Replies}/{Limit}", org.Name, replies, limit);
 
-        var to2 = new string(opts.AdminWhatsAppNumber.Where(char.IsAsciiDigit).ToArray());
+        await NotifyAdminAsync(text, ct);
+    }
+
+    /// <summary>A WhatsApp message to the admin's number (Settings → AI cost). Nothing if no number is set; never throws.</summary>
+    public async Task NotifyAdminAsync(string text, CancellationToken ct)
+    {
+        var to = new string(usage.CurrentValue.AdminWhatsAppNumber.Where(char.IsAsciiDigit).ToArray());
         var fromId = whatsAppOptions.CurrentValue.PhoneNumberId;
-        if (to2.Length < 10 || string.IsNullOrWhiteSpace(fromId))
-            return; // no admin number set: the dashboard banner still shows it
+        if (to.Length < 10 || string.IsNullOrWhiteSpace(fromId))
+            return; // no admin number set: the dashboard still shows it
         try
         {
-            await whatsApp.SendTextAsync(fromId, to2, text, replyToMessageId: null, ct);
+            await whatsApp.SendTextAsync(fromId, to, text, replyToMessageId: null, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogError(ex, "Usage alert WhatsApp to admin failed (24-hour window closed?)");
+            logger.LogError(ex, "WhatsApp to admin failed (24-hour window closed?)");
         }
     }
 

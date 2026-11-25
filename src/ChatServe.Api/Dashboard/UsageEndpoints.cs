@@ -34,7 +34,7 @@ public static class UsageEndpoints
             var orgs = await db.Organizations.AsNoTracking()
                 .Where(o => own == null || o.Id == own)
                 .OrderBy(o => o.Name)
-                .Select(o => new { o.Id, o.Name, o.MonthlyReplyLimit, o.IsActive })
+                .Select(o => new { o.Id, o.Name, o.MonthlyReplyLimit, o.IsActive, o.ExtraReplies, o.ExtraRepliesMonth })
                 .ToListAsync(ct);
             var orgIds = orgs.Select(o => o.Id).ToList();
             var restaurants = await db.Restaurants.AsNoTracking()
@@ -89,13 +89,19 @@ public static class UsageEndpoints
                 var daily = days.Where(d => d <= pkNow.Date)
                     .Select(d => new { Date = d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), Usage = Line(byDay[d]) })
                     .ToList();
-                int? percent = o.MonthlyReplyLimit is > 0 ? (int)Math.Round(usage.Replies * 100m / o.MonthlyReplyLimit.Value) : null;
+                var monthKey = first.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+                var extra = o.ExtraRepliesMonth == monthKey ? o.ExtraReplies : 0;
+                int? limitNow = o.MonthlyReplyLimit is { } pkg ? pkg + extra : null; // package + this month's top-up
+                int? percent = limitNow is > 0 ? (int)Math.Round(usage.Replies * 100m / limitNow.Value) : null;
                 var isThisMonth = first.Year == pkNow.Year && first.Month == pkNow.Month;
                 var daysGone = isThisMonth ? pkNow.Day : days.Count;
                 return new
                 {
-                    o.Id, o.Name, o.IsActive, o.MonthlyReplyLimit,
-                    RemainingReplies = o.MonthlyReplyLimit is { } l ? Math.Max(0, l - usage.Replies) : (int?)null,
+                    o.Id, o.Name, o.IsActive,
+                    MonthlyReplyLimit = limitNow,
+                    PackageReplies = o.MonthlyReplyLimit,
+                    ExtraReplies = extra,
+                    RemainingReplies = limitNow is { } l ? Math.Max(0, l - usage.Replies) : (int?)null,
                     Percent = percent,
                     Warning = percent >= p.WarnAtPercent,
                     OverLimit = percent >= 100,
