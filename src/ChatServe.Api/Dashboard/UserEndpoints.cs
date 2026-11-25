@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ChatServe.Api.Dashboard;
 
-/// <summary>Restaurant owner logins: the admin creates, resets and deletes them; owners change their own password.</summary>
+/// <summary>Client (organization) logins: the admin creates, resets and deletes them; owners change their own password.</summary>
 public static partial class UserEndpoints
 {
     public const int MinPasswordLength = 8;
@@ -23,12 +23,19 @@ public static partial class UserEndpoints
     /// <summary>Who is logged in. Used by the dashboard to show or hide admin-only pages.</summary>
     public static void MapMeEndpoints(this RouteGroupBuilder api)
     {
-        api.MapGet("/me", (ClaimsPrincipal user) => Results.Ok(new
+        api.MapGet("/me", async (ClaimsPrincipal user, AppDbContext db, CancellationToken ct) =>
         {
-            username = user.Identity?.Name,
-            role = user.IsAdmin() ? AccessControl.AdminRole : AccessControl.OwnerRole,
-            restaurantId = user.OwnRestaurantId(),
-        }));
+            var oid = user.OwnOrganizationId();
+            var orgName = oid is null ? null
+                : await db.Organizations.AsNoTracking().Where(o => o.Id == oid).Select(o => o.Name).FirstOrDefaultAsync(ct);
+            return Results.Ok(new
+            {
+                username = user.Identity?.Name,
+                role = user.IsAdmin() ? AccessControl.AdminRole : AccessControl.OwnerRole,
+                organizationId = oid,
+                organizationName = orgName,
+            });
+        });
 
         api.MapPost("/me/password", async (ChangePasswordRequest req, ClaimsPrincipal user, AppDbContext db,
             CancellationToken ct) =>
@@ -53,32 +60,22 @@ public static partial class UserEndpoints
     {
         admin.MapGet("/users", async (AppDbContext db, CancellationToken ct) =>
             await (from u in db.DashboardUsers.AsNoTracking()
-                   join r in db.Restaurants.AsNoTracking() on u.RestaurantId equals r.Id
-                   orderby r.Name, u.Username
-                   select new { u.Id, u.Username, u.RestaurantId, RestaurantName = r.Name, u.CreatedAt, u.LastLoginAt })
+                   join o in db.Organizations.AsNoTracking() on u.OrganizationId equals o.Id
+                   orderby o.Name, u.Username
+                   select new { u.Id, u.Username, u.OrganizationId, OrganizationName = o.Name, u.CreatedAt, u.LastLoginAt })
                 .ToListAsync(ct));
 
         admin.MapPost("/users", async (NewUserRequest req, AppDbContext db, TimeProvider clock, CancellationToken ct) =>
         {
-            var username = NormalizeUsername(req.Username);
-            if (UsernameProblem(username) is { } bad) return Bad(bad);
-            if (PasswordProblem(req.Password) is { } weak) return Bad(weak);
-            if (!await db.Restaurants.AnyAsync(r => r.Id == req.RestaurantId, ct))
-                return Bad("Choose a restaurant for this login.");
-            if (await db.DashboardUsers.AnyAsync(u => u.Username == username, ct))
-                return Bad("That username is already taken.");
+            if (await NewUserProblem(db, req.Username, req.Password, ct) is { } problem) return Bad(problem);
+            if (!await db.Organizations.AnyAsync(o => o.Id == req.OrganizationId, ct))
+                return Bad("Choose a client for this login.");
 
-            var user = new DashboardUser
-            {
-                Username = username,
-                PasswordHash = "",
-                RestaurantId = req.RestaurantId,
-                CreatedAt = clock.GetUtcNow(),
-            };
-            user.PasswordHash = HashPassword(user, req.Password!);
+            var user = NewUser(req.Username, req.Password!, clock);
+            user.OrganizationId = req.OrganizationId;
             db.DashboardUsers.Add(user);
             await db.SaveChangesAsync(ct);
-            return Results.Ok(new { user.Id, user.Username, user.RestaurantId });
+            return Results.Ok(new { user.Id, user.Username, user.OrganizationId });
         });
 
         admin.MapPut("/users/{id:int}/password", async (int id, ResetPasswordRequest req, AppDbContext db, CancellationToken ct) =>
@@ -102,6 +99,23 @@ public static partial class UserEndpoints
         });
     }
 
+    /// <summary>Username/password rules for a new login, including "already taken".</summary>
+    public static async Task<string?> NewUserProblem(AppDbContext db, string? rawUsername, string? password, CancellationToken ct)
+    {
+        var username = NormalizeUsername(rawUsername);
+        if (UsernameProblem(username) is { } bad) return bad;
+        if (PasswordProblem(password) is { } weak) return weak;
+        return await db.DashboardUsers.AnyAsync(u => u.Username == username, ct) ? "That username is already taken." : null;
+    }
+
+    /// <summary>A new login (OrganizationId still to be set). Call <see cref="NewUserProblem"/> first.</summary>
+    public static DashboardUser NewUser(string? username, string password, TimeProvider clock)
+    {
+        var user = new DashboardUser { Username = NormalizeUsername(username), PasswordHash = "", CreatedAt = clock.GetUtcNow() };
+        user.PasswordHash = HashPassword(user, password);
+        return user;
+    }
+
     private static string? UsernameProblem(string username) =>
         username.Length is < 3 or > 50 ? "Username must be 3 to 50 characters."
         : !UsernamePattern().IsMatch(username) ? "Username can only use letters, numbers, dots, dashes and underscores."
@@ -118,7 +132,7 @@ public static partial class UserEndpoints
     [GeneratedRegex("^[a-z0-9._-]+$")]
     private static partial Regex UsernamePattern();
 
-    public sealed record NewUserRequest(string? Username, string? Password, int RestaurantId);
+    public sealed record NewUserRequest(string? Username, string? Password, int OrganizationId);
     public sealed record ResetPasswordRequest(string? Password);
     public sealed record ChangePasswordRequest(string? CurrentPassword, string? NewPassword);
 }

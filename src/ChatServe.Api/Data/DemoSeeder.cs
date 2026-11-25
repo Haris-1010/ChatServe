@@ -77,7 +77,10 @@ public static class DemoSeeder
         r.Faqs.Add(new Faq { Question = "Do you take table bookings?", Answer = "Yes, just send your name, time and number of people on WhatsApp." });
         r.Faqs.Add(new Faq { Question = "Can you make it less spicy?", Answer = "Yes, tell us when ordering and we'll adjust the spice level." });
 
-        db.Restaurants.Add(r);
+        // Every restaurant belongs to an organization (the client). The demo gets its own.
+        var org = new Organization { Name = r.Name };
+        org.Restaurants.Add(r);
+        db.Organizations.Add(org);
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Seeded demo restaurant {Name} for phone number id {Id}", r.Name, phoneNumberId);
     }

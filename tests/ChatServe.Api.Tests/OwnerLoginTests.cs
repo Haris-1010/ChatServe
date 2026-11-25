@@ -17,9 +17,16 @@ public class OwnerLoginTests
         return (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
     }
 
+    /// <summary>The client (organization) a restaurant belongs to.</summary>
+    internal static async Task<int> OrgOfAsync(HttpClient admin, int restaurantId) =>
+        (await admin.GetFromJsonAsync<JsonElement>("/api/restaurants")).EnumerateArray()
+            .Single(r => r.GetProperty("id").GetInt32() == restaurantId).GetProperty("organizationId").GetInt32();
+
+    /// <summary>Creates a login for the client that owns <paramref name="restaurantId"/>.</summary>
     private static async Task<int> CreateOwnerAsync(HttpClient admin, string username, int restaurantId, string password = OwnerPassword)
     {
-        var res = await admin.PostAsJsonAsync("/api/users", new { username, password, restaurantId });
+        var organizationId = await OrgOfAsync(admin, restaurantId);
+        var res = await admin.PostAsJsonAsync("/api/users", new { username, password, organizationId });
         res.EnsureSuccessStatusCode();
         return (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
     }
@@ -50,7 +57,7 @@ public class OwnerLoginTests
 
         var me = await owner.GetFromJsonAsync<JsonElement>("/api/me");
         Assert.Equal("owner", me.GetProperty("role").GetString());
-        Assert.Equal(mine, me.GetProperty("restaurantId").GetInt32());
+        Assert.Equal(await OrgOfAsync(admin, mine), me.GetProperty("organizationId").GetInt32());
 
         var list = await owner.GetFromJsonAsync<JsonElement>("/api/restaurants");
         Assert.Equal(mine, list.EnumerateArray().Single().GetProperty("id").GetInt32());
@@ -139,15 +146,15 @@ public class OwnerLoginTests
     {
         var (factory, admin) = await DashboardApiTests.LoggedInAsync();
         await using var _ = factory;
-        var rid = await DashboardApiTests.RestaurantIdAsync(admin);
+        var rid = await OrgOfAsync(admin, await DashboardApiTests.RestaurantIdAsync(admin));
 
-        async Task<HttpStatusCode> Create(string username, string password, int restaurantId) =>
-            (await admin.PostAsJsonAsync("/api/users", new { username, password, restaurantId })).StatusCode;
+        async Task<HttpStatusCode> Create(string username, string password, int organizationId) =>
+            (await admin.PostAsJsonAsync("/api/users", new { username, password, organizationId })).StatusCode;
 
         Assert.Equal(HttpStatusCode.BadRequest, await Create("ok-name", "short", rid));          // password too short
         Assert.Equal(HttpStatusCode.BadRequest, await Create("admin", OwnerPassword, rid));       // reserved
         Assert.Equal(HttpStatusCode.BadRequest, await Create("bad name!", OwnerPassword, rid));   // invalid characters
-        Assert.Equal(HttpStatusCode.BadRequest, await Create("nobody", OwnerPassword, 9999));     // no such restaurant
+        Assert.Equal(HttpStatusCode.BadRequest, await Create("nobody", OwnerPassword, 9999));     // no such client
         Assert.Equal(HttpStatusCode.OK, await Create("zain", OwnerPassword, rid));
         Assert.Equal(HttpStatusCode.BadRequest, await Create("ZAIN", OwnerPassword, rid));        // duplicate
 

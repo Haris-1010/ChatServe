@@ -41,16 +41,7 @@ import { errorText, Toasts } from '../core/toast';
     }
 
     @if (auth.isAdmin()) {
-    <section class="card">
-      <h2>New restaurant (multi-tenant)</h2>
-      <p class="muted small">Each restaurant has its own WhatsApp number (Phone number ID). One app can run many restaurants.</p>
-      <form class="form-row" (ngSubmit)="create()">
-        <label class="field grow"><span>Name</span><input name="nn" [(ngModel)]="newName" /></label>
-        <label class="field grow"><span>Phone number ID</span><input name="np" [(ngModel)]="newPhoneId" /></label>
-        <button class="btn">+ Create</button>
-      </form>
-      <p class="muted small">Then give the owner a login on the <a routerLink="/users">Users</a> page.</p>
-    </section>
+      <p class="muted small">To add another restaurant or branch, or a login for this client, go to <a routerLink="/clients">All clients</a>.</p>
     }
   `,
 })
@@ -61,8 +52,6 @@ export class RestaurantPage {
   protected auth = inject(Auth);
   p = signal<RestaurantProfile | null>(null);
   busy = signal(false);
-  newName = '';
-  newPhoneId = '';
   private current = onRestaurant(rid => this.load(rid));
   private rid = computed(() => this.current.id()!);
 
@@ -80,18 +69,6 @@ export class RestaurantPage {
       this.toasts.error(errorText(e));
     } finally {
       this.busy.set(false);
-    }
-  }
-
-  async create() {
-    try {
-      const res = await this.api.createRestaurant(this.newName, this.newPhoneId);
-      await this.restaurants.load();
-      this.restaurants.select(res.id);
-      this.newName = this.newPhoneId = '';
-      this.toasts.ok('Restaurant created. Now fill in the menu and info.');
-    } catch (e) {
-      this.toasts.error(errorText(e));
     }
   }
 }

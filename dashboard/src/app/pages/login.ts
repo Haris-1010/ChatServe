@@ -23,7 +23,7 @@ import { errorText } from '../core/toast';
         </label>
         @if (error()) { <div class="alert error">{{ error() }}</div> }
         <button class="btn primary block" [disabled]="busy() || !password">{{ busy() ? 'Logging in…' : 'Login' }}</button>
-        <p class="muted small">Restaurant owners: use the username and password your admin gave you. Admin: username <code>admin</code> (local default password <code>admin</code>; change it in Settings).</p>
+        <p class="muted small">Use the username and password ChatServe gave you.</p>
       </form>
     </div>
   `,
@@ -44,7 +44,8 @@ export class Login {
       const res = await this.api.login(this.username.trim() || 'admin', this.password);
       this.auth.set(res.accessToken);
       this.auth.me.set(await this.api.me());
-      this.router.navigate(['/']);
+      // The admin starts on the list of all clients; a client starts on their restaurant's home page.
+      this.router.navigate([this.auth.isAdmin() ? '/clients' : '/']);
     } catch (e) {
       this.error.set(errorText(e));
     } finally {

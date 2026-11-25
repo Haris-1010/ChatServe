@@ -9,29 +9,44 @@ public static class RestaurantEndpoints
 {
     public static void MapRestaurantEndpoints(this RouteGroupBuilder api)
     {
-        // Admin sees every restaurant; an owner only their own.
+        // Admin sees every restaurant; an owner only their organization's restaurants.
         api.MapGet("/restaurants", async (ClaimsPrincipal user, AppDbContext db, CancellationToken ct) =>
         {
-            var own = user.OwnRestaurantId();
-            return await db.Restaurants.AsNoTracking()
-                .Where(r => own == null || r.Id == own)
-                .OrderBy(r => r.Id)
-                .Select(r => new { r.Id, r.Name, r.WhatsAppPhoneNumberId, r.IsBotEnabled })
+            var own = user.OwnOrganizationId();
+            return await (from r in db.Restaurants.AsNoTracking()
+                          join o in db.Organizations.AsNoTracking() on r.OrganizationId equals o.Id
+                          where own == null || r.OrganizationId == own
+                          orderby o.Name, r.Name, r.Id
+                          select new
+                          {
+                              r.Id, r.Name, r.WhatsAppPhoneNumberId, r.IsBotEnabled,
+                              r.OrganizationId, OrganizationName = o.Name,
+                          })
                 .ToListAsync(ct);
         });
 
+        // Admin: add a restaurant (branch) to a client. Without an organization, a new client with the same name is created.
         api.MapPost("/restaurants", async (NewRestaurantInput input, AppDbContext db, CancellationToken ct) =>
         {
-            if (string.IsNullOrWhiteSpace(input.Name) || string.IsNullOrWhiteSpace(input.WhatsAppPhoneNumberId))
-                return Bad("Name and WhatsApp Phone number ID are both required.");
-            var phoneId = input.WhatsAppPhoneNumberId.Trim();
-            if (await db.Restaurants.AnyAsync(r => r.WhatsAppPhoneNumberId == phoneId, ct))
-                return Bad("A restaurant already exists for this Phone number ID.");
+            if (await NewRestaurantProblem(db, input.Name, input.WhatsAppPhoneNumberId, ct) is { } problem)
+                return Bad(problem);
 
-            var r = new Restaurant { Name = input.Name.Trim(), WhatsAppPhoneNumberId = phoneId };
-            db.Restaurants.Add(r);
+            var r = new Restaurant { Name = input.Name!.Trim(), WhatsAppPhoneNumberId = input.WhatsAppPhoneNumberId!.Trim() };
+            if (input.OrganizationId is { } oid)
+            {
+                if (!await db.Organizations.AnyAsync(o => o.Id == oid, ct))
+                    return Bad("That client doesn't exist.");
+                r.OrganizationId = oid;
+                db.Restaurants.Add(r);
+            }
+            else
+            {
+                var org = new Organization { Name = r.Name };
+                org.Restaurants.Add(r);
+                db.Organizations.Add(org);
+            }
             await db.SaveChangesAsync(ct);
-            return Results.Ok(new { r.Id });
+            return Results.Ok(new { r.Id, r.OrganizationId });
         }).RequireAuthorization(AccessControl.AdminPolicy);
 
         var one = api.MapGroup("/restaurants/{rid:int}");
@@ -211,6 +226,17 @@ public static class RestaurantEndpoints
 
     internal static IResult Bad(string message) => Results.Problem(message, statusCode: StatusCodes.Status400BadRequest);
 
+    /// <summary>Checks a new restaurant's name and WhatsApp Phone number ID (must be unique: incoming messages are routed by it).</summary>
+    public static async Task<string?> NewRestaurantProblem(AppDbContext db, string? name, string? phoneNumberId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(phoneNumberId))
+            return "Restaurant name and WhatsApp Phone number ID are both required.";
+        var phoneId = phoneNumberId.Trim();
+        return await db.Restaurants.AnyAsync(r => r.WhatsAppPhoneNumberId == phoneId, ct)
+            ? "A restaurant already exists for this Phone number ID."
+            : null;
+    }
+
     private static async Task<IResult?> Validate(AppDbContext db, int rid, string? message, CancellationToken ct)
     {
         if (message is not null) return Bad(message);
@@ -229,7 +255,7 @@ public static class RestaurantEndpoints
         r.Id, r.Name, r.WhatsAppPhoneNumberId, r.IsBotEnabled, r.BotTone, r.Address, r.Timings, r.DeliveryAreas,
         r.MinimumOrder, r.PaymentMethods, r.ExtraInfo, r.Currency, r.StaffWhatsAppNumber);
 
-    public sealed record NewRestaurantInput(string? Name, string? WhatsAppPhoneNumberId);
+    public sealed record NewRestaurantInput(string? Name, string? WhatsAppPhoneNumberId, int? OrganizationId = null);
 
     public sealed record RestaurantProfile(
         int Id, string? Name, string? WhatsAppPhoneNumberId, bool IsBotEnabled, string? BotTone, string? Address,

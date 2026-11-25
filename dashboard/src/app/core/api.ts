@@ -10,7 +10,10 @@ export type OrderType = 'Delivery' | 'Takeaway' | 'DineIn';
 export type BookingStatus = 'Requested' | 'Confirmed' | 'Cancelled';
 export type ChatRole = 'Customer' | 'Bot' | 'Staff';
 
-export interface RestaurantSummary { id: number; name: string; whatsAppPhoneNumberId: string; isBotEnabled: boolean; }
+export interface RestaurantSummary {
+  id: number; name: string; whatsAppPhoneNumberId: string; isBotEnabled: boolean;
+  organizationId: number; organizationName: string;
+}
 
 export interface RestaurantProfile {
   id: number; name: string; whatsAppPhoneNumberId: string; isBotEnabled: boolean;
@@ -71,9 +74,25 @@ export interface SettingsResponse { settings: Setting[]; webhookUrl: string; dat
 export interface TestResult { ok: boolean; message: string; }
 
 export type Role = 'admin' | 'owner';
-export interface Me { username: string; role: Role; restaurantId: number | null; }
-export interface DashboardUserRow {
-  id: number; username: string; restaurantId: number; restaurantName: string; createdAt: string; lastLoginAt: string | null;
+export interface Me { username: string; role: Role; organizationId: number | null; organizationName: string | null; }
+
+/** Admin "All clients" page: every client (organization) with its branches, today's numbers and logins. */
+export interface ClientBranch {
+  id: number; name: string; whatsAppPhoneNumberId: string; isBotEnabled: boolean;
+  ordersToday: number; salesToday: number; activeOrders: number; chatsToday: number; lastMessageAt: string | null;
+}
+export interface ClientLogin { id: number; username: string; lastLoginAt: string | null; }
+export interface Client {
+  id: number; name: string; isActive: boolean; createdAt: string;
+  ordersToday: number; salesToday: number; chatsToday: number;
+  restaurants: ClientBranch[]; users: ClientLogin[];
+}
+export interface ClientsResponse {
+  totals: { clientCount: number; activeClients: number; restaurants: number; ordersToday: number; salesToday: number; chatsToday: number };
+  clients: Client[];
+}
+export interface NewClient {
+  name: string; restaurantName?: string; whatsAppPhoneNumberId?: string; username?: string; password?: string;
 }
 
 export interface SimulatorResult {
@@ -112,8 +131,13 @@ export class Api {
   me() { return this.get<Me>('/api/me'); }
   changePassword(currentPassword: string, newPassword: string) { return this.post<void>('/api/me/password', { currentPassword, newPassword }); }
 
-  users() { return this.get<DashboardUserRow[]>('/api/users'); }
-  createUser(username: string, password: string, restaurantId: number) { return this.post<{ id: number }>('/api/users', { username, password, restaurantId }); }
+  clients() { return this.get<ClientsResponse>('/api/clients'); }
+  createClient(c: NewClient) { return this.post<{ id: number; restaurantId: number | null }>('/api/clients', c); }
+  updateClient(id: number, name: string, isActive: boolean) { return this.put<void>(`/api/clients/${id}`, { name, isActive }); }
+  deleteClient(id: number) { return this.del(`/api/clients/${id}`); }
+  moveRestaurant(rid: number, organizationId: number) { return this.put<void>(`/api/restaurants/${rid}/client`, { organizationId }); }
+
+  createUser(username: string, password: string, organizationId: number) { return this.post<{ id: number }>('/api/users', { username, password, organizationId }); }
   resetUserPassword(id: number, password: string) { return this.put<void>(`/api/users/${id}/password`, { password }); }
   deleteUser(id: number) { return this.del(`/api/users/${id}`); }
 
@@ -124,7 +148,9 @@ export class Api {
   testAi() { return this.post<TestResult>('/api/settings/test/ai'); }
 
   restaurants() { return this.get<RestaurantSummary[]>('/api/restaurants'); }
-  createRestaurant(name: string, whatsAppPhoneNumberId: string) { return this.post<{ id: number }>('/api/restaurants', { name, whatsAppPhoneNumberId }); }
+  createRestaurant(name: string, whatsAppPhoneNumberId: string, organizationId?: number) {
+    return this.post<{ id: number; organizationId: number }>('/api/restaurants', { name, whatsAppPhoneNumberId, organizationId });
+  }
   restaurant(rid: number) { return this.get<RestaurantProfile>(`/api/restaurants/${rid}`); }
   saveRestaurant(rid: number, p: RestaurantProfile) { return this.put<RestaurantProfile>(`/api/restaurants/${rid}`, p); }
 
@@ -181,6 +207,20 @@ export class CurrentRestaurant {
   }
 
   get current() { return this.list().find(r => r.id === this.id()) ?? null; }
+
+  /** Restaurants grouped by client, for the switcher. */
+  groups() {
+    const map = new Map<string, RestaurantSummary[]>();
+    for (const r of this.list()) map.set(r.organizationName, [...(map.get(r.organizationName) ?? []), r]);
+    return [...map.entries()].map(([name, items]) => ({ name, items }));
+  }
+}
+
+/** A random, easy-to-type password (no look-alike characters). */
+export function randomPassword() {
+  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  return Array.from(bytes, b => chars[b % chars.length]).join('');
 }
 
 // ---------- Helpers ----------

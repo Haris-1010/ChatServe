@@ -4,6 +4,7 @@ A WhatsApp AI auto-reply agent for restaurants.
 - **Phase 1 ✅** Meta webhook (verify + receive), Graph API reply
 - **Phase 2 ✅** Claude (Haiku 5.5) answers from the restaurant's menu/settings/FAQs, with chat memory in PostgreSQL
 - **Phase 3 ✅** Order flow: AI tools (order draft, status, table booking, human handover), customer "confirm", WhatsApp ticket to the kitchen
+- **Clients ✅** many clients (organizations), each with many restaurants; a client login sees only its own restaurants, the admin sees all of them on **All clients**
 - **Phase 5 ✅ (dashboard)** Angular dashboard: all settings, menu/deals/FAQs/delivery areas, live orders, chats (staff reply, bot pause), bookings, customers (CSV), and a **bot simulator** that works without WhatsApp
 
 ## Quick start (with the dashboard)
@@ -38,7 +39,7 @@ While working on the dashboard (hot reload): keep the API running with `dotnet r
 
 Progress notes: `PROJECT_CONTEXT.md`, `docs/PHASE2_PROGRESS.md`, `docs/PHASE3_PROGRESS.md`, `docs/PHASE5_PROGRESS.md`.
 
-Running it for real shops: `docs/ONBOARDING.md` (going live, onboarding a restaurant, where its number goes, pricing). Current setup and next steps: `docs/HOW_IT_WORKS.md`.
+Deploying: **`docs/DEPLOY_RAILWAY.md`** (Railway + PostgreSQL). Running it for real shops: `docs/ONBOARDING.md` (going live, onboarding a restaurant, where its number goes, pricing). Current setup and next steps: `docs/HOW_IT_WORKS.md`.
 
 ```
 Customer (WhatsApp) → Meta Cloud API → POST /webhook → queue → MessageProcessingService
@@ -86,7 +87,7 @@ All the settings below (except the connection string) can also be set from the *
 | `WhatsApp:AppSecret` | App settings > Basic > App secret ("Show") |
 | `WhatsApp:ValidateSignature` | `true` in production (default). `false` in Development |
 | `WhatsApp:GraphApiVersion` | Default `v23.0`. Use the version shown in the curl example on the API Setup page |
-| `ConnectionStrings:Default` | PostgreSQL. On Railway/Render, `DATABASE_URL` also works (postgres:// format) |
+| `ConnectionStrings:Default` | PostgreSQL. On Railway, set `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (postgres:// format works) |
 | `Anthropic:ApiKey` | console.anthropic.com > API Keys (or the `ANTHROPIC_API_KEY` env var) |
 | `Anthropic:Model` | Default `claude-haiku-5-5` |
 | `Anthropic:Effort` | Default `low` (enough for chat, cheaper and faster). Use `medium` if replies seem weak |

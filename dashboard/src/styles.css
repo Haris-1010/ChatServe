@@ -320,3 +320,27 @@ textarea { resize: vertical; }
 /* ---------- Accounts ---------- */
 .signed-in { margin: 0 4px 8px; overflow-wrap: anywhere; }
 .form-col.narrow { max-width: 460px; }
+
+/* ---------- All clients (admin) ---------- */
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.step { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); min-width: 0; }
+.step > .form-col { flex: 1; min-width: 0; }
+.step-n { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--primary); color: #fff; font-weight: 700; }
+.client { display: flex; flex-direction: column; gap: 12px; }
+.client.suspended { opacity: .75; border-style: dashed; }
+.client-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+.client-head h2 { margin: 0 0 2px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.branches { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.branches > .muted { padding: 10px 12px; }
+.branch { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; flex-wrap: wrap; }
+.branch + .branch { border-top: 1px solid var(--border); }
+.branch-main { min-width: 0; flex: 1 1 260px; }
+.branch-main b { margin-right: 6px; }
+select.move { width: auto; max-width: 220px; padding: 4px 8px; font-size: 12.5px; }
+.logins { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.login-chip { display: inline-flex; gap: 6px; align-items: center; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); font-size: 12.5px; }
+.link.small { font-size: 12px; }
+.link.danger { color: var(--danger); }
+.content > app-clients > input.search { max-width: 360px; }
+.step .row { flex-wrap: nowrap; }
+.step .row input { flex: 1; }

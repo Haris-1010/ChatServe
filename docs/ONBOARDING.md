@@ -10,7 +10,7 @@ ChatServe must not run on your PC with a test number when real shops use it. Do 
 
 | # | What | Why |
 |---|---|---|
-| 1 | **Deploy online** (Render + Neon is prepared: branch `render-deploy`, `render.yaml`; Render needs a card, paid plan ≈ $7/month) | It must run 24/7, not only while your PC is on |
+| 1 | **Deploy online** on Railway (`railway.json` + `docs/DEPLOY_RAILWAY.md`; app + PostgreSQL in one project, Hobby plan) | It must run 24/7, not only while your PC is on |
 | 2 | **Meta business verification** of the ChatServe business portfolio (business registration / NTN or a utility bill, website) | Unverified portfolios can't add real phone numbers ("Phone Numbers Count Exceeded Limit Per Business") |
 | 3 | **Permanent Meta token** (Business settings → System users → Generate token, expiry "Never", permissions `whatsapp_business_messaging`, `whatsapp_business_management`) | The "Try it out" token expires and replies stop (error 190) |
 | 4 | **Payment method** in WhatsApp Manager | Meta charges for some messages (e.g. order updates sent after the 24-hour window, marketing). Replying to customers who message first is mostly free |
@@ -55,10 +55,10 @@ ChatServe must not run on your PC with a test number when real shops use it. Do 
 1. **Meta — WhatsApp Manager** (your ChatServe portfolio)
    `business.facebook.com` → WhatsApp Manager → **Phone numbers** → **Add phone number** → display name (e.g. "XYZ BBQ") → category Restaurant → `+92 3xx xxxxxxx` → SMS code → done.
    Copy the new **Phone number ID** (a long number, not the phone number).
-2. **ChatServe — Restaurant info** (log in as `admin`)
-   **New restaurant** → name + **Phone number ID** → Create. Then fill in info, menu, deals, FAQs, delivery areas, kitchen number. Test it in **Bot test (simulator)**.
-3. **ChatServe — Users**
-   **New owner login** → choose the restaurant → username + password → give these to the shop owner privately.
+2. **ChatServe — All clients** (log in as `admin`)
+   **+ New client** → business name, restaurant name + **Phone number ID**, login username + password → Create client. (A new branch of an existing client: **+ Add restaurant** on its card.) Give the username/password to the shop owner privately.
+3. **ChatServe — Open → the restaurant**
+   Fill in Restaurant info, Menu & FAQs, delivery areas, kitchen number. Test it in **Test the bot**.
 
 Nothing else changes: the webhook URL, token and AI key are shared by all shops. (The WhatsApp Business Account must be subscribed to the ChatServe app once — already done for account `1812438219994148`.)
 
