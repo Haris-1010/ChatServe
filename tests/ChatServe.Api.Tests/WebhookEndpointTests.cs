@@ -23,6 +23,16 @@ public sealed class FakeWhatsAppClient : IWhatsAppClient
         return Task.FromResult<string?>("wamid.OUT");
     }
 
+    /// <summary>Messages sent with buttons (also counted in <see cref="Sent"/>).</summary>
+    public ConcurrentQueue<(string To, string Body, InteractiveMessage Buttons)> Interactive { get; } = new();
+
+    public Task<string?> SendInteractiveAsync(string phoneNumberId, string to, string body, InteractiveMessage interactive, CancellationToken ct = default)
+    {
+        Interactive.Enqueue((to, body, interactive));
+        Sent.Enqueue((phoneNumberId, to, body));
+        return Task.FromResult<string?>("wamid.OUT");
+    }
+
     public Dictionary<string, MediaFile> Media { get; } = new();
 
     public Task<MediaFile> DownloadMediaAsync(string mediaId, CancellationToken ct = default) =>

@@ -23,7 +23,9 @@ public sealed class ClaudeReplyGenerator(
     StaffCommandHandler? staffCommands = null,
     IVoiceTranscriber? voice = null,
     IWhatsAppClient? media = null,
-    UsageAlerts? usageAlerts = null) : IReplyGenerator
+    UsageAlerts? usageAlerts = null,
+    FeedbackFlow? feedback = null,
+    ReplyButtons? buttons = null) : IReplyGenerator
 {
     public const string NonTextReply =
         "Sorry, I can only read text messages for now. Please type your question. 🙏";
@@ -88,14 +90,18 @@ public sealed class ClaudeReplyGenerator(
         string reply;
         AiResult? result = null;
         Order? newDraft = null;
+        InteractiveMessage? interactive = null;
+        FeedbackOutcome? fb = null;
         var staffAlerts = new List<string>();
         var pending = string.IsNullOrWhiteSpace(text) ? null : await orders.GetPendingDraftAsync(customer.Id, now, ct);
+        var lastBotId = await LastBotMessageIdAsync(customer.Id, ct);
 
         if (string.IsNullOrWhiteSpace(text))
         {
             reply = CustomerText.CannotRead(ru, isVoice); // no AI call needed, save money
         }
-        else if (pending is not null && OrderFormatter.IsConfirmation(text, await SummaryWasLastBotMessageAsync(customer.Id, pending, ct)))
+        else if (pending is not null && (message.ReplyId == ConfirmId ||
+                 OrderFormatter.IsConfirmation(text, pending.SummaryChatMessageId is not null && lastBotId == pending.SummaryChatMessageId)))
         {
             // The customer confirmed: the order now goes to the kitchen. Fixed reply, no AI call.
             await orders.ConfirmAsync(pending, now, ct);
@@ -103,13 +109,23 @@ public sealed class ClaudeReplyGenerator(
             staffAlerts.Add(OrderFormatter.KitchenTicket(pending, restaurant.Currency));
             logger.LogInformation("Order {OrderId} confirmed for {Restaurant}, total {Total}", pending.Id, restaurant.Name, pending.Total);
         }
-        else if (pending is not null && OrderFormatter.IsCancellation(text))
+        else if (pending is not null && (message.ReplyId == CancelId || OrderFormatter.IsCancellation(text)))
         {
             await orders.CancelDraftAsync(pending, now, ct);
             reply = CustomerText.DraftCancelled(ru);
         }
+        else if (feedback is not null &&
+                 (fb = await feedback.TryHandleAsync(restaurant, customer, message.ReplyId, text, lastBotId, now, ru, ct)) is { Reply: not null })
+        {
+            // Delivery received / rating / short thanks: fixed replies, no AI call.
+            reply = fb.Reply;
+            interactive = fb.Buttons;
+            staffAlerts.AddRange(fb.StaffAlerts);
+        }
         else
         {
+            // A feedback comment was saved (fb.Reply null): the AI still answers it, in case it also asks for something.
+            if (fb is not null) staffAlerts.AddRange(fb.StaffAlerts);
             var tools = new OrderToolExecutor(orders, restaurant, customer, now, ru);
             var history = WithCurrentTime(await LoadHistoryAsync(customer.Id, ct), now, PendingNote(pending, restaurant.Currency));
             var failed = false;
@@ -141,6 +157,9 @@ public sealed class ClaudeReplyGenerator(
                 var summary = OrderFormatter.DraftSummary(newDraft, restaurant.Currency, ru);
                 reply = failed && !tools.HandedOver ? summary : reply + "\n\n" + summary;
             }
+
+            if (newDraft is not null && !tools.HandedOver)
+                interactive = DraftButtons(ru);
         }
 
         var botMessage = new ChatMessage
@@ -163,6 +182,15 @@ public sealed class ClaudeReplyGenerator(
             newDraft.SummaryChatMessageId = botMessage.Id; // "1" only counts as confirm right after this summary
             await db.SaveChangesAsync(ct);
         }
+
+        if (fb is { AskedForInput: true })
+        {
+            fb.Order.FeedbackPromptMessageId = botMessage.Id; // a plain "5" or a comment only counts right after this
+            await db.SaveChangesAsync(ct);
+        }
+
+        if (buttons is not null)
+            buttons.Value = interactive;
 
         foreach (var alert in staffAlerts)
             await staff.NotifyAsync(restaurant, alert, ct);
@@ -198,18 +226,25 @@ public sealed class ClaudeReplyGenerator(
     public const string HandoverReply =
         "Thank you! A member of our team will reply to you here soon. 🙏";
 
-    /// <summary>"1" only counts as confirm when the customer sends it right after the summary (not as an answer to some other question).</summary>
-    private async Task<bool> SummaryWasLastBotMessageAsync(int customerId, Order pending, CancellationToken ct)
-    {
-        if (pending.SummaryChatMessageId is null)
-            return false;
-        var lastBotId = await db.ChatMessages
+    public const string ConfirmId = "order:confirm";
+    public const string ChangeId = "order:change";
+    public const string CancelId = "order:cancel";
+
+    /// <summary>Buttons under an order summary. "Change" goes to the AI, which asks what to change.</summary>
+    public static InteractiveMessage DraftButtons(bool ru) => new(
+    [
+        new(ConfirmId, ru ? "✅ Confirm karein" : "✅ Confirm"),
+        new(ChangeId, ru ? "✏️ Tabdeeli" : "✏️ Change"),
+        new(CancelId, "❌ Cancel"),
+    ]);
+
+    /// <summary>The id of the bot's last message to this customer. "1" only confirms right after the summary; "5" only rates right after the rating question.</summary>
+    private Task<long?> LastBotMessageIdAsync(int customerId, CancellationToken ct) =>
+        db.ChatMessages
             .Where(m => m.CustomerId == customerId && m.Role == ChatRole.Bot)
             .OrderByDescending(m => m.CreatedAt).ThenByDescending(m => m.Id)
             .Select(m => (long?)m.Id)
             .FirstOrDefaultAsync(ct);
-        return lastBotId == pending.SummaryChatMessageId;
-    }
 
     /// <summary>Tool calls aren't saved in history, so we tell the AI about the pending draft as a note.</summary>
     internal static string? PendingNote(Order? pending, string currency) => pending is null

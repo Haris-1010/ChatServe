@@ -14,6 +14,13 @@ public interface IWhatsAppClient
     Task<string?> SendTextAsync(string phoneNumberId, string to, string body,
         string? replyToMessageId = null, CancellationToken ct = default);
 
+    /// <summary>
+    /// Sends text with buttons or a list under it. Implementations without buttons (test fakes) send the plain-text version.
+    /// </summary>
+    Task<string?> SendInteractiveAsync(string phoneNumberId, string to, string body, InteractiveMessage interactive,
+        CancellationToken ct = default) =>
+        SendTextAsync(phoneNumberId, to, interactive.AsPlainText(body), replyToMessageId: null, ct);
+
     /// <summary>Downloads a media file a customer sent (e.g. a voice note): first its URL from the Graph API, then the bytes.</summary>
     Task<MediaFile> DownloadMediaAsync(string mediaId, CancellationToken ct = default);
 
@@ -70,6 +77,89 @@ public sealed class WhatsAppClient(HttpClient http, IOptionsMonitor<WhatsAppOpti
 
         logger.LogInformation("Reply sent to {To} (wamid {MessageId})", Mask(to), id);
         return id;
+    }
+
+    public async Task<string?> SendInteractiveAsync(string phoneNumberId, string to, string body, InteractiveMessage interactive,
+        CancellationToken ct = default)
+    {
+        // Interactive text is limited to 1024 characters: send a long text on its own, then the buttons with a short line.
+        if (body.Length > InteractiveMessage.MaxBodyLength)
+        {
+            await SendTextAsync(phoneNumberId, to, body, replyToMessageId: null, ct);
+            body = "👇";
+        }
+
+        try
+        {
+            using var doc = await PostAsync(phoneNumberId, BuildInteractive(to, body, interactive), ct);
+            var id = doc.RootElement.TryGetProperty("messages", out var msgs) && msgs.GetArrayLength() > 0
+                ? msgs[0].GetProperty("id").GetString()
+                : null;
+            logger.LogInformation("Reply with {Count} options sent to {To} (wamid {MessageId})", interactive.Options.Count, Mask(to), id);
+            return id;
+        }
+        catch (WhatsAppApiException ex) when (ex.StatusCode == 400 && ex.ResponseBody?.Contains("131047") != true)
+        {
+            // Buttons refused (e.g. a title too long): the customer still gets the message, with numbered options.
+            logger.LogWarning("Buttons refused by WhatsApp, sending plain text instead");
+            return await SendTextAsync(phoneNumberId, to, interactive.AsPlainText(body), replyToMessageId: null, ct);
+        }
+    }
+
+    internal static object BuildInteractive(string to, string body, InteractiveMessage m)
+    {
+        var header = string.IsNullOrWhiteSpace(m.Header) ? null : new { type = "text", text = Cut(m.Header, 60) };
+        var footer = string.IsNullOrWhiteSpace(m.Footer) ? null : new { text = Cut(m.Footer, 60) };
+        object action = m.IsList
+            ? new
+            {
+                button = Cut(m.ListButton!, 20),
+                sections = new[]
+                {
+                    new
+                    {
+                        title = Cut(m.Header ?? "Options", 24),
+                        rows = m.Options.Take(InteractiveMessage.MaxRows).Select(o => new
+                        {
+                            id = Cut(o.Id, 200),
+                            title = Cut(o.Title, 24),
+                            description = o.Description is null ? null : Cut(o.Description, 72),
+                        }).ToArray(),
+                    },
+                },
+            }
+            : new
+            {
+                buttons = m.Options.Take(InteractiveMessage.MaxButtons).Select(o => new
+                {
+                    type = "reply",
+                    reply = new { id = Cut(o.Id, 256), title = Cut(o.Title, 20) },
+                }).ToArray(),
+            };
+
+        return new
+        {
+            messaging_product = "whatsapp",
+            recipient_type = "individual",
+            to,
+            type = "interactive",
+            interactive = new { type = m.IsList ? "list" : "button", header, body = new { text = body }, footer, action },
+        };
+    }
+
+    /// <summary>Cuts by text elements, so an emoji is never split in half.</summary>
+    private static string Cut(string s, int max)
+    {
+        if (s.Length <= max) return s;
+        var e = System.Globalization.StringInfo.GetTextElementEnumerator(s);
+        var sb = new StringBuilder();
+        while (e.MoveNext())
+        {
+            var part = (string)e.Current;
+            if (sb.Length + part.Length > max) break;
+            sb.Append(part);
+        }
+        return sb.ToString();
     }
 
     public async Task MarkAsReadAsync(string phoneNumberId, string messageId, bool showTyping = true,

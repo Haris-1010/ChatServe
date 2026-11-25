@@ -9,4 +9,5 @@ public sealed record IncomingMessage(
     string Type,
     string? Text,           // text, or the text of a button/list reply; null for other types
     DateTimeOffset ReceivedAt,
-    string? MediaId = null); // voice note / audio: downloaded and transcribed
+    string? MediaId = null, // voice note / audio: downloaded and transcribed
+    string? ReplyId = null); // the id of the button or list row the customer tapped (e.g. "rate:12:5")

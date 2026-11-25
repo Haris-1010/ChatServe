@@ -55,6 +55,7 @@ import { errorText, Toasts } from '../core/toast';
           <a routerLink="/chats" routerLinkActive="active"><span>💬</span> Chats</a>
           <a routerLink="/bookings" routerLinkActive="active"><span>📅</span> Bookings</a>
           <a routerLink="/customers" routerLinkActive="active"><span>👥</span> Customers</a>
+          <a routerLink="/feedback" routerLinkActive="active"><span>⭐</span> Feedback</a>
           <div class="nav-label">Bot setup</div>
           <a routerLink="/menu" routerLinkActive="active"><span>🍛</span> Menu &amp; FAQs</a>
           <a routerLink="/restaurant" routerLinkActive="active"><span>🏪</span> Restaurant info</a>

@@ -16,6 +16,7 @@ export const routes: Routes = [
       { path: 'simulator', loadComponent: () => import('./pages/simulator').then(m => m.SimulatorPage) },
       { path: 'menu', loadComponent: () => import('./pages/menu').then(m => m.MenuPage) },
       { path: 'bookings', loadComponent: () => import('./pages/bookings').then(m => m.BookingsPage) },
+      { path: 'feedback', loadComponent: () => import('./pages/feedback').then(m => m.FeedbackPage) },
       { path: 'customers', loadComponent: () => import('./pages/customers').then(m => m.CustomersPage) },
       { path: 'training', loadComponent: () => import('./pages/training').then(m => m.TrainingPage) },
       { path: 'restaurant', loadComponent: () => import('./pages/restaurant').then(m => m.RestaurantPage) },

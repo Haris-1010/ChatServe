@@ -24,6 +24,9 @@ import { errorText, Toasts } from '../core/toast';
           <div class="stat-sub">{{ s.botRepliesToday }} bot replies · {{ s.pausedChats }} with staff</div></a>
         <a class="stat link" routerLink="/bookings"><div class="stat-label">Upcoming bookings</div><div class="stat-value">{{ s.upcomingBookings }}</div></a>
         <a class="stat link" routerLink="/customers"><div class="stat-label">Customers</div><div class="stat-value">{{ s.customers }}</div></a>
+        <a class="stat link" routerLink="/feedback"><div class="stat-label">Rating (30 days)</div>
+          <div class="stat-value">{{ s.averageRating30Days != null ? '⭐ ' + s.averageRating30Days : '—' }}</div>
+          <div class="stat-sub">{{ s.ratingCount30Days }} {{ s.ratingCount30Days === 1 ? 'rating' : 'ratings' }}</div></a>
         @if (auth.isAdmin()) {
         <div class="stat"><div class="stat-label">AI tokens today</div><div class="stat-value small-value">{{ s.inputTokensToday.toLocaleString() }} in</div>
           <div class="stat-sub">{{ s.outputTokensToday.toLocaleString() }} out</div></div>

@@ -78,7 +78,11 @@ public sealed class MessageProcessingService(
         if (string.IsNullOrWhiteSpace(reply))
             return;
 
-        await whatsApp.SendTextAsync(message.PhoneNumberId, message.From, reply, replyToMessageId: null, ct);
+        var buttons = scope.ServiceProvider.GetService<ReplyButtons>()?.Value;
+        if (buttons is not null)
+            await whatsApp.SendInteractiveAsync(message.PhoneNumberId, message.From, reply, buttons, ct);
+        else
+            await whatsApp.SendTextAsync(message.PhoneNumberId, message.From, reply, replyToMessageId: null, ct);
     }
 
     private bool TryMarkSeen(string messageId)

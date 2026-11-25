@@ -175,6 +175,19 @@ public sealed class Order
     /// <summary>The bot message that carried this summary. "1" only counts as confirm right after it.</summary>
     public long? SummaryChatMessageId { get; set; }
 
+    // ---- After delivery: the customer says they got it, then rates it ----
+
+    /// <summary>When the customer said they received the order ("mil gaya" / the button). Null = not yet.</summary>
+    public DateTimeOffset? ReceivedAt { get; set; }
+
+    /// <summary>1 to 5 stars from the customer.</summary>
+    public int? Rating { get; set; }
+    public string? FeedbackComment { get; set; }
+    public DateTimeOffset? FeedbackAt { get; set; }
+
+    /// <summary>The bot message that asked for the rating or the comment: a plain "5" or a comment only counts right after it.</summary>
+    public long? FeedbackPromptMessageId { get; set; }
+
     public List<OrderItem> Items { get; set; } = [];
 }
 

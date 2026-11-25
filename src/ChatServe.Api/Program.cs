@@ -61,6 +61,8 @@ builder.Services.AddScoped<IStaffNotifier, WhatsAppStaffNotifier>();
 builder.Services.AddScoped<StaffCommandHandler>();
 builder.Services.AddScoped<UsageAlerts>();
 builder.Services.AddScoped<SimulationContext>();
+builder.Services.AddScoped<FeedbackFlow>();
+builder.Services.AddScoped<ChatServe.Api.WhatsApp.ReplyButtons>(); // buttons under the reply to the current message
 
 // ---- Message pipeline ----
 builder.Services.AddSingleton<IMessageQueue, MessageQueue>();

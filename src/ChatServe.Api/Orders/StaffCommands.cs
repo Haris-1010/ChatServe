@@ -139,7 +139,8 @@ public sealed class StaffCommandHandler(
 
         var ru = await CustomerText.PrefersRomanUrduAsync(db, order.CustomerId, null, ct);
         var customerText = CustomerText.Status(order, restaurant.Currency, ru);
-        var error = await OperationsEndpoints.SendStaffMessageAsync(db, whatsApp, restaurant, order.CustomerId, order.Phone, customerText, now, ct);
+        var error = await OperationsEndpoints.SendStaffMessageAsync(db, whatsApp, restaurant, order.CustomerId, order.Phone, customerText, now, ct,
+            buttons: FeedbackFlow.DeliveryButtons(order, ru));
 
         // Keep the rest of the team in the loop (like a group).
         await staff.NotifyAsync(restaurant, $"ℹ️ Order #{order.Id} ({order.CustomerName}): {StatusLabel(status)}. Updated by +{from}.", ct, exceptPhone: from);

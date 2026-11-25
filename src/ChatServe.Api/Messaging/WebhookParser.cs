@@ -37,7 +37,8 @@ public static class WebhookParser
                     Type: msg.Type ?? "unknown",
                     Text: GetText(msg),
                     ReceivedAt: ParseTimestamp(msg.Timestamp),
-                    MediaId: msg.Type == "audio" ? msg.Audio?.Id : null));
+                    MediaId: msg.Type == "audio" ? msg.Audio?.Id : null,
+                    ReplyId: msg.Interactive?.ButtonReply?.Id ?? msg.Interactive?.ListReply?.Id ?? msg.Button?.Payload));
             }
         }
 

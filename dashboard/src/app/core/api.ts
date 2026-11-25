@@ -33,6 +33,16 @@ export interface Order {
   deliveryAddress: string | null; deliveryArea: string | null; paymentMethod: string | null; notes: string | null;
   subtotal: number; deliveryCharge: number; total: number;
   createdAt: string; updatedAt: string; confirmedAt: string | null; items: OrderItem[];
+  receivedAt: string | null; rating: number | null; feedbackComment: string | null; feedbackAt: string | null;
+}
+
+export interface FeedbackEntry {
+  id: number; customerName: string; phone: string; type: OrderType; total: number; rating: number;
+  feedbackComment: string | null; feedbackAt: string; receivedAt: string | null; createdAt: string; items: string[];
+}
+export interface FeedbackReport {
+  count: number; average: number | null; stars: { stars: number; count: number }[]; withComment: number;
+  deliveredOrders: number; received: number; feedback: FeedbackEntry[];
 }
 
 export interface Booking {
@@ -58,7 +68,7 @@ export interface ChatMessage {
 export interface Overview {
   ordersToday: number; revenueToday: number; activeOrders: number; awaitingConfirmation: number;
   customers: number; chatsToday: number; botRepliesToday: number; inputTokensToday: number; outputTokensToday: number;
-  pausedChats: number; upcomingBookings: number;
+  pausedChats: number; upcomingBookings: number; ratingCount30Days: number; averageRating30Days: number | null;
   recentOrders: { id: number; customerName: string; status: OrderStatus; type: OrderType; total: number; createdAt: string }[];
 }
 
@@ -95,8 +105,11 @@ export interface NewClient {
   name: string; restaurantName?: string; whatsAppPhoneNumberId?: string; username?: string; password?: string;
 }
 
+export interface ReplyOption { id: string; title: string; description: string | null; }
+export interface ReplyButtons { options: ReplyOption[]; listButton: string | null; header: string | null; footer: string | null; }
 export interface SimulatorResult {
   phone: string; reply: string | null; note: string | null; staffAlerts: string[]; usedAi: boolean; milliseconds: number;
+  buttons: ReplyButtons | null;
 }
 
 // ---------- Labels ----------
@@ -203,9 +216,10 @@ export class Api {
   sendStaffMessage(rid: number, cid: number, text: string, pauseBot: boolean) {
     return this.post<{ botPausedUntil: string | null }>(`/api/restaurants/${rid}/customers/${cid}/messages`, { text, pauseBot });
   }
-  simulate(rid: number, phone: string, name: string, text: string) {
-    return this.post<SimulatorResult>(`/api/restaurants/${rid}/simulator`, { phone, name, text });
+  simulate(rid: number, phone: string, name: string, text: string, replyId?: string) {
+    return this.post<SimulatorResult>(`/api/restaurants/${rid}/simulator`, { phone, name, text, replyId });
   }
+  feedback(rid: number, days: number) { return this.get<FeedbackReport>(`/api/restaurants/${rid}/feedback`, { days }); }
 }
 
 // ---------- Currently selected restaurant ----------

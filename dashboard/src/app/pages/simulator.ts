@@ -1,10 +1,10 @@
 import { Component, computed, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Api, CurrentRestaurant } from '../core/api';
+import { Api, CurrentRestaurant, ReplyButtons, ReplyOption } from '../core/api';
 import { errorText, Toasts } from '../core/toast';
 
-interface Line { from: 'me' | 'bot' | 'system' | 'staff'; text: string; meta?: string; }
+interface Line { from: 'me' | 'bot' | 'system' | 'staff'; text: string; meta?: string; buttons?: ReplyButtons | null; }
 
 const PKEY = 'chatserve.simPhone';
 function newPhone() { return '000' + Math.floor(100000000 + Math.random() * 899999999); }
@@ -33,8 +33,30 @@ function newPhone() { return '000' + Math.floor(100000000 + Math.random() * 8999
               <div class="sys" [class.staff]="l.from === 'staff'">{{ l.text }}</div>
             } @else {
               <div class="bubble-row" [class.out]="l.from === 'me'">
-                <div class="bubble" [class.me]="l.from === 'me'"><div class="text">{{ l.text }}</div>
-                  @if (l.meta) { <div class="meta">{{ l.meta }}</div> }</div>
+                <div class="bubble" [class.me]="l.from === 'me'">
+                  @if (l.buttons?.header) { <div class="wa-header">{{ l.buttons!.header }}</div> }
+                  <div class="text">{{ l.text }}</div>
+                  @if (l.buttons?.footer) { <div class="wa-footer">{{ l.buttons!.footer }}</div> }
+                  @if (l.meta) { <div class="meta">{{ l.meta }}</div> }
+                  @if (l.buttons; as b) {
+                    @if (b.listButton) {
+                      <button class="wa-btn" (click)="openList.set(openList() === $index ? null : $index)" [disabled]="busy()">☰ {{ b.listButton }}</button>
+                      @if (openList() === $index) {
+                        <div class="wa-list">
+                          @for (o of b.options; track o.id) {
+                            <button class="wa-row" (click)="tap(o)" [disabled]="busy()">
+                              <b>{{ o.title }}</b>@if (o.description) { <span class="muted small">{{ o.description }}</span> }
+                            </button>
+                          }
+                        </div>
+                      }
+                    } @else {
+                      @for (o of b.options; track o.id) {
+                        <button class="wa-btn" (click)="tap(o)" [disabled]="busy()">{{ o.title }}</button>
+                      }
+                    }
+                  }
+                </div>
               </div>
             }
           } @empty {
@@ -53,7 +75,7 @@ function newPhone() { return '000' + Math.floor(100000000 + Math.random() * 8999
         <div class="muted small">Test numbers start with "000". Nothing is sent to real WhatsApp.</div>
         <h3>Quick questions</h3>
         <div class="chips">
-          @for (q of quick; track q) { <button class="chip" (click)="text = q; send()" [disabled]="busy()">{{ q }}</button> }
+          @for (q of quick; track q) { <button class="chip" (click)="send(q)" [disabled]="busy()">{{ q }}</button> }
         </div>
         <p class="small muted">If a reply looks wrong, fix the <a routerLink="/menu">Menu/FAQs</a> or <a routerLink="/restaurant">Restaurant info</a>. The bot uses the new data from the next message.</p>
       </aside>
@@ -67,11 +89,12 @@ export class SimulatorPage {
   private scroller = viewChild<ElementRef<HTMLElement>>('scroller');
   lines = signal<Line[]>([]);
   busy = signal(false);
+  openList = signal<number | null>(null);
   phone = signal(this.loadPhone());
   name = 'Test Customer';
   text = '';
   quick = ['Send me the menu', 'How much is the karahi?', 'Do you deliver to DHA?', "What's in the family deal?",
-    '1 full chicken karahi and 4 naan, Johar Town', 'confirm', 'Book a table for 4 tomorrow at 9 pm', 'Where is my order?'];
+    '1 full chicken karahi and 4 naan, Johar Town', 'confirm', 'Book a table for 4 tomorrow at 9 pm', 'Where is my order?', 'Order mil gaya'];
   private rid = computed(() => this.restaurants.id());
 
   private loadPhone() {
@@ -88,16 +111,20 @@ export class SimulatorPage {
     this.lines.set([]);
   }
 
-  async send() {
-    const text = this.text.trim();
+  /** A tapped WhatsApp button / list row: sent like the real webhook, with its id. */
+  tap(o: ReplyOption) { this.openList.set(null); this.send(o.title, o.id); }
+
+  async send(typed?: string, replyId?: string) {
+    const text = (typed ?? this.text).trim();
     const rid = this.rid();
     if (!text || !rid) return;
-    this.text = '';
+    if (typed === undefined) this.text = '';
     this.push({ from: 'me', text });
     this.busy.set(true);
     try {
-      const res = await this.api.simulate(rid, this.phone(), this.name, text);
-      if (res.reply) this.push({ from: 'bot', text: res.reply, meta: `${res.usedAi ? 'AI' : 'Welcome reply (AI OFF)'} · ${(res.milliseconds / 1000).toFixed(1)}s` });
+      const res = await this.api.simulate(rid, this.phone(), this.name, text, replyId);
+      if (res.reply) this.push({ from: 'bot', text: res.reply, buttons: res.buttons,
+        meta: `${res.usedAi ? 'AI' : 'Welcome reply (AI OFF)'} · ${(res.milliseconds / 1000).toFixed(1)}s` });
       if (res.note) this.push({ from: 'system', text: res.note });
       for (const a of res.staffAlerts) this.push({ from: 'staff', text: '📲 Would be sent to kitchen/staff:\n' + a });
     } catch (e) {

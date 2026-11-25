@@ -36,8 +36,14 @@ public static class OperationsEndpoints
                 .Select(o => new { o.Id, o.CustomerName, o.Status, o.Type, o.Total, o.CreatedAt })
                 .ToListAsync(ct);
 
+            var monthAgo = now.AddDays(-30);
+            var ratings = orders.Where(o => o.Rating != null && o.FeedbackAt >= monthAgo);
+            var ratingCount = await ratings.CountAsync(ct);
+
             return Results.Ok(new
             {
+                RatingCount30Days = ratingCount,
+                AverageRating30Days = ratingCount == 0 ? (double?)null : Math.Round(await ratings.AverageAsync(o => (double)o.Rating!.Value, ct), 1),
                 OrdersToday = await todayConfirmed.CountAsync(ct),
                 RevenueToday = await todayConfirmed.SumAsync(o => (decimal?)o.Total, ct) ?? 0,
                 ActiveOrders = await orders.CountAsync(o =>
@@ -92,7 +98,8 @@ public static class OperationsEndpoints
                 var restaurant = await db.Restaurants.AsNoTracking().FirstAsync(r => r.Id == rid, ct);
                 var ru = await CustomerText.PrefersRomanUrduAsync(db, order.CustomerId, null, ct);
                 var text = CustomerText.Status(order, restaurant.Currency, ru);
-                notifyError = await SendStaffMessageAsync(db, whatsApp, restaurant, order.CustomerId, order.Phone, text, now, ct);
+                notifyError = await SendStaffMessageAsync(db, whatsApp, restaurant, order.CustomerId, order.Phone, text, now, ct,
+                    buttons: FeedbackFlow.DeliveryButtons(order, ru));
             }
             return Results.Ok(new { order, NotifyError = notifyError });
         });
@@ -248,8 +255,10 @@ public static class OperationsEndpoints
             sim.IsActive = true;
             var generator = scope.ServiceProvider.GetRequiredService<IReplyGenerator>();
 
+            var tapped = string.IsNullOrWhiteSpace(req.ReplyId) ? null : req.ReplyId.Trim();
             var message = new IncomingMessage("sim-" + Guid.NewGuid().ToString("N"), restaurant.WhatsAppPhoneNumberId, phone,
-                string.IsNullOrWhiteSpace(req.Name) ? "Test Customer" : req.Name.Trim(), "text", req.Text.Trim(), clock.GetUtcNow());
+                string.IsNullOrWhiteSpace(req.Name) ? "Test Customer" : req.Name.Trim(), tapped is null ? "text" : "interactive",
+                req.Text.Trim(), clock.GetUtcNow(), ReplyId: tapped);
 
             var started = clock.GetTimestamp();
             var reply = await generator.GenerateReplyAsync(message, ct);
@@ -264,7 +273,40 @@ public static class OperationsEndpoints
                     : "The bot did not reply.";
             }
 
-            return Results.Ok(new { Phone = phone, Reply = reply, Note = note, StaffAlerts = sim.StaffAlerts, UsedAi = bot.CurrentValue.UseAi, Milliseconds = ms });
+            var buttons = scope.ServiceProvider.GetRequiredService<ReplyButtons>().Value;
+            return Results.Ok(new
+            {
+                Phone = phone, Reply = reply, Note = note, StaffAlerts = sim.StaffAlerts, UsedAi = bot.CurrentValue.UseAi, Milliseconds = ms,
+                Buttons = reply is null ? null : buttons,
+            });
+        });
+
+        // ---- Customer feedback (ratings after delivery) ----
+        one.MapGet("/feedback", async (int rid, int? days, AppDbContext db, TimeProvider clock, CancellationToken ct) =>
+        {
+            var from = clock.GetUtcNow().AddDays(-(days is > 0 and <= 3650 ? days.Value : 30));
+            var rated = db.Orders.AsNoTracking().Where(o => o.RestaurantId == rid && o.Rating != null && o.FeedbackAt >= from);
+            var stars = await rated.GroupBy(o => o.Rating!.Value).Select(g => new { Stars = g.Key, Count = g.Count() }).ToListAsync(ct);
+            var count = stars.Sum(s => s.Count);
+            var list = await rated.OrderByDescending(o => o.FeedbackAt).Take(300)
+                .Select(o => new
+                {
+                    o.Id, o.CustomerName, o.Phone, o.Type, o.Total, o.Rating, o.FeedbackComment, o.FeedbackAt, o.ReceivedAt, o.CreatedAt,
+                    Items = o.Items.Select(i => i.Quantity + " x " + i.Name).ToList(),
+                })
+                .ToListAsync(ct);
+            var delivered = await db.Orders.AsNoTracking().CountAsync(o => o.RestaurantId == rid && o.Type == OrderType.Delivery &&
+                o.Status == OrderStatus.Completed && o.UpdatedAt >= from, ct);
+            return Results.Ok(new
+            {
+                Count = count,
+                Average = count == 0 ? (double?)null : Math.Round(stars.Sum(s => s.Stars * s.Count) / (double)count, 1),
+                Stars = Enumerable.Range(1, 5).Reverse().Select(n => new { Stars = n, Count = stars.FirstOrDefault(s => s.Stars == n)?.Count ?? 0 }),
+                WithComment = list.Count(o => o.FeedbackComment != null),
+                DeliveredOrders = delivered,
+                Received = await db.Orders.AsNoTracking().CountAsync(o => o.RestaurantId == rid && o.ReceivedAt >= from, ct),
+                Feedback = list,
+            });
         });
     }
 
@@ -285,7 +327,8 @@ public static class OperationsEndpoints
 
     /// <summary>A WhatsApp message from staff + chat log. Simulator customers get no WhatsApp, only the log. Returns the error message if any.</summary>
     internal static async Task<string?> SendStaffMessageAsync(AppDbContext db, IWhatsAppClient whatsApp, Restaurant restaurant,
-        int customerId, string phone, string text, DateTimeOffset now, CancellationToken ct, bool saveOnFailure = true)
+        int customerId, string phone, string text, DateTimeOffset now, CancellationToken ct, bool saveOnFailure = true,
+        InteractiveMessage? buttons = null)
     {
         string? error = null;
         string? wamid = null;
@@ -293,7 +336,9 @@ public static class OperationsEndpoints
         {
             try
             {
-                wamid = await whatsApp.SendTextAsync(restaurant.WhatsAppPhoneNumberId, phone, text, replyToMessageId: null, ct);
+                wamid = buttons is null
+                    ? await whatsApp.SendTextAsync(restaurant.WhatsAppPhoneNumberId, phone, text, replyToMessageId: null, ct)
+                    : await whatsApp.SendInteractiveAsync(restaurant.WhatsAppPhoneNumberId, phone, text, buttons, ct);
             }
             catch (WhatsAppApiException ex)
             {
@@ -326,5 +371,5 @@ public static class OperationsEndpoints
     public sealed record StatusChange<T>(T Status, bool NotifyCustomer) where T : struct, Enum;
     public sealed record PauseRequest(int? Hours);
     public sealed record StaffReply(string? Text, bool PauseBot);
-    public sealed record SimulatorRequest(string? Phone, string? Name, string? Text);
+    public sealed record SimulatorRequest(string? Phone, string? Name, string? Text, string? ReplyId = null);
 }

@@ -248,6 +248,15 @@ textarea { resize: vertical; }
 .bubble.staff { outline: 2px solid var(--info-soft); }
 .bubble .who { font-size: 11px; font-weight: 700; color: var(--primary-strong); }
 .bubble .text { white-space: pre-wrap; word-wrap: break-word; }
+.bubble .wa-header { font-weight: 700; margin-bottom: 2px; }
+.bubble .wa-footer { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.bubble .wa-btn { display: block; width: 100%; margin-top: 6px; padding: 7px 8px; border: 0; border-top: 1px solid rgba(127,127,127,.25);
+  background: transparent; color: #1f8fde; font-weight: 600; cursor: pointer; border-radius: 0; }
+.bubble .wa-btn:hover:not(:disabled) { background: rgba(31,143,222,.08); }
+.bubble .wa-list { display: flex; flex-direction: column; margin-top: 4px; border-top: 1px solid rgba(127,127,127,.25); }
+.bubble .wa-row { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 4px; border: 0;
+  border-bottom: 1px solid rgba(127,127,127,.15); background: transparent; color: inherit; cursor: pointer; text-align: left; }
+.bubble .wa-row:hover:not(:disabled) { background: rgba(127,127,127,.1); }
 .bubble .meta { font-size: 10.5px; color: var(--muted); text-align: right; }
 .composer { display: flex; gap: 10px; padding: 10px; border-top: 1px solid var(--border); align-items: flex-end; }
 .composer-side { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }

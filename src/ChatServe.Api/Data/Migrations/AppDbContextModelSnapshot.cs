@@ -369,6 +369,16 @@ namespace ChatServe.Api.Data.Migrations
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
 
+                    b.Property<DateTimeOffset?>("FeedbackAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FeedbackComment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<long?>("FeedbackPromptMessageId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Notes")
                         .HasColumnType("text");
 
@@ -380,6 +390,12 @@ namespace ChatServe.Api.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("Rating")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("RestaurantId")
                         .HasColumnType("integer");
@@ -411,6 +427,8 @@ namespace ChatServe.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CustomerId", "Status");
+
+                    b.HasIndex("RestaurantId", "FeedbackAt");
 
                     b.HasIndex("RestaurantId", "Status", "CreatedAt");
 

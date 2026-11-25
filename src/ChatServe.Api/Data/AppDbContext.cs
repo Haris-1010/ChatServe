@@ -98,6 +98,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.Phone).HasMaxLength(20);
             e.Property(x => x.DeliveryArea).HasMaxLength(100);
             e.Property(x => x.PaymentMethod).HasMaxLength(50);
+            e.Property(x => x.FeedbackComment).HasMaxLength(1000);
+            e.HasIndex(x => new { x.RestaurantId, x.FeedbackAt });
             e.Property(x => x.Subtotal).HasPrecision(10, 2);
             e.Property(x => x.DeliveryCharge).HasPrecision(10, 2);
             e.Property(x => x.Total).HasPrecision(10, 2);
