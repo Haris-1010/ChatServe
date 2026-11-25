@@ -44,40 +44,54 @@ public static class UsageEndpoints
                 .ToListAsync(ct);
             var rids = restaurants.Select(r => r.Id).ToList();
 
-            var replies = await db.ChatMessages.AsNoTracking()
+            // One row per AI call (bot replies + other AI use such as reading screenshots), totalled in memory:
+            // per restaurant, per client and per day.
+            var botRows = await db.ChatMessages.AsNoTracking()
                 .Where(m => rids.Contains(m.RestaurantId) && m.Role == ChatRole.Bot && m.InputTokens != null
                             && m.CreatedAt >= from && m.CreatedAt < to)
-                .GroupBy(m => m.RestaurantId)
-                .Select(g => new Tokens(g.Key, g.Count(),
-                    g.Sum(m => (long?)m.InputTokens) ?? 0, g.Sum(m => (long?)m.OutputTokens) ?? 0,
-                    g.Sum(m => (long?)m.CacheReadTokens) ?? 0, g.Sum(m => (long?)m.CacheWriteTokens) ?? 0))
+                .Select(m => new Row(m.RestaurantId, m.CreatedAt, 1,
+                    m.InputTokens ?? 0, m.OutputTokens ?? 0, m.CacheReadTokens ?? 0, m.CacheWriteTokens ?? 0))
                 .ToListAsync(ct);
-            var extra = await db.AiUsageLogs.AsNoTracking()
+            var extraRows = await db.AiUsageLogs.AsNoTracking()
                 .Where(l => rids.Contains(l.RestaurantId) && l.CreatedAt >= from && l.CreatedAt < to)
-                .GroupBy(l => l.RestaurantId)
-                .Select(g => new Tokens(g.Key, 0,
-                    g.Sum(l => (long)l.InputTokens), g.Sum(l => (long)l.OutputTokens),
-                    g.Sum(l => (long)l.CacheReadTokens), g.Sum(l => (long)l.CacheWriteTokens)))
+                .Select(l => new Row(l.RestaurantId, l.CreatedAt, 0, l.InputTokens, l.OutputTokens, l.CacheReadTokens, l.CacheWriteTokens))
                 .ToListAsync(ct);
+            var rows = botRows.Concat(extraRows).ToList();
 
             var p = prices.CurrentValue;
-            UsageLine Line(IEnumerable<Tokens> parts)
+            var showCost = own == null; // owners see their replies, not our tokens and cost
+            UsageLine Line(IEnumerable<Row> part)
             {
-                var t = parts.Aggregate(new Tokens(0, 0, 0, 0, 0, 0), (a, b) => a + b);
-                var usd = p.CostUsd(t.Input, t.Output, t.CacheRead, t.CacheWrite);
-                return new UsageLine(t.Replies, t.Input, t.Output, t.CacheRead, t.CacheWrite,
-                    Math.Round(usd, 4), Math.Round(usd * p.PkrPerUsd, 0));
+                long i = 0, o = 0, cr = 0, cw = 0;
+                var n = 0;
+                foreach (var r in part) { n += r.Replies; i += r.Input; o += r.Output; cr += r.CacheRead; cw += r.CacheWrite; }
+                if (!showCost) return new UsageLine(n, 0, 0, 0, 0, 0, 0);
+                var usd = p.CostUsd(i, o, cr, cw);
+                return new UsageLine(n, i, o, cr, cw, Math.Round(usd, 4), Math.Round(usd * p.PkrPerUsd, 0));
             }
+
+            var total = Line(rows);
+            var days = Enumerable.Range(0, (first.AddMonths(1) - first).Days).Select(d => first.AddDays(d)).ToList();
+            static DateTime PkDay(DateTimeOffset t) => t.ToOffset(Money.PakistanOffset).Date;
 
             var clients = orgs.Select(o =>
             {
+                var orgRids = restaurants.Where(r => r.OrganizationId == o.Id).Select(r => r.Id).ToHashSet();
+                var orgRows = rows.Where(r => orgRids.Contains(r.RestaurantId)).ToList();
                 var rs = restaurants.Where(r => r.OrganizationId == o.Id).Select(r => new
                 {
                     r.Id, r.Name,
-                    Usage = Line(replies.Concat(extra).Where(t => t.RestaurantId == r.Id)),
+                    Usage = Line(orgRows.Where(x => x.RestaurantId == r.Id)),
                 }).ToList();
-                var usage = Line(replies.Concat(extra).Where(t => rs.Any(r => r.Id == t.RestaurantId)));
+                var usage = Line(orgRows);
+                var tokens = usage.InputTokens + usage.OutputTokens + usage.CacheReadTokens + usage.CacheWriteTokens;
+                var byDay = orgRows.ToLookup(r => PkDay(r.At));
+                var daily = days.Where(d => d <= pkNow.Date)
+                    .Select(d => new { Date = d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), Usage = Line(byDay[d]) })
+                    .ToList();
                 int? percent = o.MonthlyReplyLimit is > 0 ? (int)Math.Round(usage.Replies * 100m / o.MonthlyReplyLimit.Value) : null;
+                var isThisMonth = first.Year == pkNow.Year && first.Month == pkNow.Month;
+                var daysGone = isThisMonth ? pkNow.Day : days.Count;
                 return new
                 {
                     o.Id, o.Name, o.IsActive, o.MonthlyReplyLimit,
@@ -86,18 +100,26 @@ public static class UsageEndpoints
                     Warning = percent >= p.WarnAtPercent,
                     OverLimit = percent >= 100,
                     Usage = usage,
+                    TotalTokens = tokens,
+                    AvgTokensPerReply = usage.Replies > 0 ? tokens / usage.Replies : 0,
+                    AvgCostPkrPerReply = usage.Replies > 0 ? Math.Round(usage.CostPkr / usage.Replies, 2) : 0,
+                    SharePercent = showCost && total.CostUsd > 0 ? (int)Math.Round(usage.CostUsd * 100 / total.CostUsd) : (int?)null,
+                    RepliesPerDay = daysGone > 0 ? Math.Round(usage.Replies / (decimal)daysGone, 1) : 0,
+                    // At this month's pace, the replies at month end (to see early who will run out)
+                    ProjectedReplies = isThisMonth && daysGone > 0 ? (int)Math.Round(usage.Replies * (decimal)days.Count / daysGone) : usage.Replies,
+                    Daily = daily,
                     Restaurants = rs,
                 };
             }).ToList();
 
-            var total = Line(replies.Concat(extra));
             return Results.Ok(new
             {
                 Month = first.ToString("yyyy-MM", CultureInfo.InvariantCulture),
-                p.PkrPerUsd,
+                ShowCost = showCost,
+                PkrPerUsd = showCost ? p.PkrPerUsd : 0,
                 p.WarnAtPercent,
                 Total = total,
-                Credit = own == null ? await CreditAsync(db, p, total, ct) : null,
+                Credit = showCost ? await CreditAsync(db, p, total, ct) : null,
                 Clients = clients,
             });
         });
@@ -180,6 +202,8 @@ public static class UsageEndpoints
     }
 
     public sealed record CreditRequest(decimal? BalanceUsd);
+
+    private sealed record Row(int RestaurantId, DateTimeOffset At, int Replies, long Input, long Output, long CacheRead, long CacheWrite);
 
     private sealed record Tokens(int RestaurantId, int Replies, long Input, long Output, long CacheRead, long CacheWrite)
     {

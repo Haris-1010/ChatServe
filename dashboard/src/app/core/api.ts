@@ -69,6 +69,7 @@ export interface Overview {
   ordersToday: number; revenueToday: number; activeOrders: number; awaitingConfirmation: number;
   customers: number; chatsToday: number; botRepliesToday: number; inputTokensToday: number; outputTokensToday: number;
   pausedChats: number; upcomingBookings: number; ratingCount30Days: number; averageRating30Days: number | null;
+  repliesThisMonth: number; monthlyReplyLimit: number | null; repliesLeft: number | null;
   recentOrders: { id: number; customerName: string; status: OrderStatus; type: OrderType; total: number; createdAt: string }[];
 }
 
@@ -134,6 +135,9 @@ export interface UsageLine {
 export interface UsageClient {
   id: number; name: string; isActive: boolean; monthlyReplyLimit: number | null; remainingReplies: number | null;
   percent: number | null; warning: boolean; overLimit: boolean; usage: UsageLine;
+  totalTokens: number; avgTokensPerReply: number; avgCostPkrPerReply: number; sharePercent: number | null;
+  repliesPerDay: number; projectedReplies: number;
+  daily: { date: string; usage: UsageLine }[];
   restaurants: { id: number; name: string; usage: UsageLine }[];
 }
 export interface UsageCredit {
@@ -141,7 +145,8 @@ export interface UsageCredit {
   percent: number; tokensLeft: number | null; repliesLeft: number | null;
 }
 export interface UsageReport {
-  month: string; pkrPerUsd: number; warnAtPercent: number; total: UsageLine; credit: UsageCredit | null; clients: UsageClient[];
+  month: string; showCost: boolean; pkrPerUsd: number; warnAtPercent: number; total: UsageLine; credit: UsageCredit | null;
+  clients: UsageClient[];
 }
 
 export interface Training { text: string | null; maxLength: number; }

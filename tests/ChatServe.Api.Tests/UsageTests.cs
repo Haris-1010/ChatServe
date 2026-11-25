@@ -84,7 +84,27 @@ public class UsageTests
         owner.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var mine = await owner.GetFromJsonAsync<JsonElement>("/api/usage");
-        Assert.Equal("Butt Foods", Assert.Single(mine.GetProperty("clients").EnumerateArray()).GetProperty("name").GetString());
+        var mineClient = Assert.Single(mine.GetProperty("clients").EnumerateArray());
+        Assert.Equal("Butt Foods", mineClient.GetProperty("name").GetString());
+        // The owner sees replies used and left, but not our tokens and cost
+        Assert.False(mine.GetProperty("showCost").GetBoolean());
+        Assert.Equal(2, mineClient.GetProperty("usage").GetProperty("replies").GetInt32());
+        Assert.Equal(8, mineClient.GetProperty("remainingReplies").GetInt32());
+        Assert.Equal(0m, mineClient.GetProperty("usage").GetProperty("costPkr").GetDecimal());
+        Assert.Equal(0, mineClient.GetProperty("totalTokens").GetInt64());
+        Assert.Equal(0, mine.GetProperty("total").GetProperty("inputTokens").GetInt64());
+
+        // The admin gets the detail: tokens per reply, share of the cost, and day by day
+        var detail = Client(await admin.GetFromJsonAsync<JsonElement>("/api/usage"), "Butt Foods");
+        Assert.Equal(1_200_000, detail.GetProperty("avgTokensPerReply").GetInt64());
+        Assert.Equal(89, detail.GetProperty("sharePercent").GetInt32()); // $0.40 of $0.45
+        var today = detail.GetProperty("daily").EnumerateArray().Last();
+        Assert.Equal(2, today.GetProperty("usage").GetProperty("replies").GetInt32());
+
+        // The owner's Home page shows the replies left too
+        var home = await owner.GetFromJsonAsync<JsonElement>($"/api/restaurants/{butt}/overview");
+        Assert.Equal(2, home.GetProperty("repliesThisMonth").GetInt32());
+        Assert.Equal(8, home.GetProperty("repliesLeft").GetInt32());
         Assert.Equal(HttpStatusCode.Forbidden, (await owner.PutAsJsonAsync($"/api/clients/{oid}/limit", new { monthlyReplyLimit = 99999 })).StatusCode);
 
         // Another month has nothing

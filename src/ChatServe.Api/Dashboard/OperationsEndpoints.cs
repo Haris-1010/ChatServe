@@ -36,12 +36,23 @@ public static class OperationsEndpoints
                 .Select(o => new { o.Id, o.CustomerName, o.Status, o.Type, o.Total, o.CreatedAt })
                 .ToListAsync(ct);
 
+            // The client's AI replies this month (all its restaurants) against its package
+            var orgId = await db.Restaurants.Where(r => r.Id == rid).Select(r => r.OrganizationId).FirstAsync(ct);
+            var limit = await db.Organizations.Where(o => o.Id == orgId).Select(o => o.MonthlyReplyLimit).FirstAsync(ct);
+            var (_, monthFrom, monthTo) = Ai.UsageAlerts.Month(now);
+            var repliesThisMonth = await db.ChatMessages.CountAsync(m =>
+                db.Restaurants.Any(r => r.Id == m.RestaurantId && r.OrganizationId == orgId) &&
+                m.Role == ChatRole.Bot && m.InputTokens != null && m.CreatedAt >= monthFrom && m.CreatedAt < monthTo, ct);
+
             var monthAgo = now.AddDays(-30);
             var ratings = orders.Where(o => o.Rating != null && o.FeedbackAt >= monthAgo);
             var ratingCount = await ratings.CountAsync(ct);
 
             return Results.Ok(new
             {
+                RepliesThisMonth = repliesThisMonth,
+                MonthlyReplyLimit = limit,
+                RepliesLeft = limit is { } l ? Math.Max(0, l - repliesThisMonth) : (int?)null,
                 RatingCount30Days = ratingCount,
                 AverageRating30Days = ratingCount == 0 ? (double?)null : Math.Round(await ratings.AverageAsync(o => (double)o.Rating!.Value, ct), 1),
                 OrdersToday = await todayConfirmed.CountAsync(ct),

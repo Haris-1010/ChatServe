@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Api, money, ORDER_STATUS_LABEL, ORDER_TYPE_LABEL, Overview, Status, when } from '../core/api';
+import { Api, money, ORDER_STATUS_LABEL, ORDER_TYPE_LABEL, Overview, Status, UsageCredit, when } from '../core/api';
 import { Auth } from '../core/auth';
 import { onRestaurant } from '../core/page';
 import { errorText, Toasts } from '../core/toast';
@@ -8,6 +8,12 @@ import { errorText, Toasts } from '../core/toast';
 @Component({
   selector: 'app-overview',
   imports: [RouterLink],
+  styles: [`
+    .mini-bar { height: 6px; border-radius: 4px; background: rgba(127,127,127,.2); overflow: hidden; margin-top: 8px; }
+    .mini-bar div { height: 100%; background: var(--primary); }
+    .warn-stat { border-color: rgba(245, 166, 35, .7) !important; }
+    .warn-stat .mini-bar div { background: #f5a623; }
+  `],
   template: `
     <div class="page-head">
       <h1>Home</h1>
@@ -27,6 +33,24 @@ import { errorText, Toasts } from '../core/toast';
         <a class="stat link" routerLink="/feedback"><div class="stat-label">Rating (30 days)</div>
           <div class="stat-value">{{ s.averageRating30Days != null ? '⭐ ' + s.averageRating30Days : '—' }}</div>
           <div class="stat-sub">{{ s.ratingCount30Days }} {{ s.ratingCount30Days === 1 ? 'rating' : 'ratings' }}</div></a>
+        <a class="stat link" routerLink="/usage" [class.warn-stat]="s.monthlyReplyLimit && s.repliesLeft! <= s.monthlyReplyLimit * 0.2">
+          <div class="stat-label">AI replies left this month</div>
+          @if (s.monthlyReplyLimit) {
+            <div class="stat-value">{{ s.repliesLeft!.toLocaleString() }}</div>
+            <div class="stat-sub">{{ s.repliesThisMonth.toLocaleString() }} of {{ s.monthlyReplyLimit.toLocaleString() }} used</div>
+            <div class="mini-bar"><div [style.width.%]="pct(s.repliesThisMonth, s.monthlyReplyLimit)"></div></div>
+          } @else {
+            <div class="stat-value">{{ s.repliesThisMonth.toLocaleString() }}</div>
+            <div class="stat-sub">replies used · no monthly limit</div>
+          }
+        </a>
+        @if (auth.isAdmin() && credit(); as cr) {
+        <a class="stat link" routerLink="/usage" [class.warn-stat]="cr.percent <= 20">
+          <div class="stat-label">Anthropic credit left (all clients)</div>
+          <div class="stat-value small-value">{{ cr.tokensLeft != null ? cr.tokensLeft.toLocaleString() + ' tokens' : '$ ' + cr.remainingUsd.toFixed(2) }}</div>
+          <div class="stat-sub">$ {{ cr.remainingUsd.toFixed(2) }} of $ {{ cr.balanceUsd.toFixed(2) }}@if (cr.repliesLeft != null) { · ~{{ cr.repliesLeft.toLocaleString() }} replies }</div>
+        </a>
+        }
         @if (auth.isAdmin()) {
         <div class="stat"><div class="stat-label">AI tokens today</div><div class="stat-value small-value">{{ s.inputTokensToday.toLocaleString() }} in</div>
           <div class="stat-sub">{{ s.outputTokensToday.toLocaleString() }} out</div></div>
@@ -84,6 +108,7 @@ export class OverviewPage {
   private api = inject(Api);
   private toasts = inject(Toasts);
   stats = signal<Overview | null>(null);
+  credit = signal<UsageCredit | null>(null);
   status = signal<Status | null>(null);
   money = money;
   when = when;
@@ -100,6 +125,7 @@ export class OverviewPage {
   /** The setup checklist (keys, webhook) is only for the admin. */
   private loadStatus() {
     if (!this.auth.isAdmin()) return;
+    this.api.usage().then(u => this.credit.set(u.credit)).catch(() => { /* optional card */ });
     this.api.status().then(s => this.status.set(s)).catch(e => this.toasts.error(errorText(e)));
   }
 
@@ -112,6 +138,8 @@ export class OverviewPage {
     if (id) this.load(id);
     this.loadStatus();
   }
+
+  pct(a: number, b: number) { return Math.min(100, b ? a * 100 / b : 0); }
 
   copy(text: string) {
     navigator.clipboard?.writeText(text).then(() => this.toasts.ok('Copied'), () => this.toasts.error('Could not copy. Please select the text and copy it yourself'));
