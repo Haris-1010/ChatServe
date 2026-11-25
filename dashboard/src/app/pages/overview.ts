@@ -10,7 +10,7 @@ import { errorText, Toasts } from '../core/toast';
   imports: [RouterLink],
   template: `
     <div class="page-head">
-      <h1>Overview</h1>
+      <h1>Home</h1>
       <button class="btn ghost" (click)="refresh()">↻ Refresh</button>
     </div>
 
@@ -24,8 +24,10 @@ import { errorText, Toasts } from '../core/toast';
           <div class="stat-sub">{{ s.botRepliesToday }} bot replies · {{ s.pausedChats }} with staff</div></a>
         <a class="stat link" routerLink="/bookings"><div class="stat-label">Upcoming bookings</div><div class="stat-value">{{ s.upcomingBookings }}</div></a>
         <a class="stat link" routerLink="/customers"><div class="stat-label">Customers</div><div class="stat-value">{{ s.customers }}</div></a>
+        @if (auth.isAdmin()) {
         <div class="stat"><div class="stat-label">AI tokens today</div><div class="stat-value small-value">{{ s.inputTokensToday.toLocaleString() }} in</div>
           <div class="stat-sub">{{ s.outputTokensToday.toLocaleString() }} out</div></div>
+        }
       </div>
     }
 
@@ -69,7 +71,7 @@ import { errorText, Toasts } from '../core/toast';
             </tbody>
           </table>
         } @else {
-          <p class="muted">No orders yet. Try placing a test order with the bot in the <a routerLink="/simulator">Simulator</a>.</p>
+          <p class="muted">No orders yet. Try placing a test order with the bot in <a routerLink="/simulator">Test the bot</a>.</p>
         }
       </section>
     </div>

@@ -139,13 +139,13 @@ namespace ChatServe.Api.Data.Migrations
                     b.Property<DateTimeOffset?>("LastLoginAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
-
-                    b.Property<int>("RestaurantId")
-                        .HasColumnType("integer");
 
                     b.Property<string>("SecurityStamp")
                         .IsRequired()
@@ -159,7 +159,7 @@ namespace ChatServe.Api.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("RestaurantId");
+                    b.HasIndex("OrganizationId");
 
                     b.HasIndex("Username")
                         .IsUnique();
@@ -419,6 +419,30 @@ namespace ChatServe.Api.Data.Migrations
                     b.ToTable("OrderItems");
                 });
 
+            modelBuilder.Entity("ChatServe.Api.Data.Organization", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Organizations");
+                });
+
             modelBuilder.Entity("ChatServe.Api.Data.Restaurant", b =>
                 {
                     b.Property<int>("Id")
@@ -459,6 +483,9 @@ namespace ChatServe.Api.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("PaymentMethods")
                         .HasColumnType("text");
 
@@ -475,6 +502,8 @@ namespace ChatServe.Api.Data.Migrations
                         .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
 
                     b.HasIndex("WhatsAppPhoneNumberId")
                         .IsUnique();
@@ -532,6 +561,25 @@ namespace ChatServe.Api.Data.Migrations
                     b.ToTable("TableBookings");
                 });
 
+            modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FriendlyName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Xml")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DataProtectionKeys");
+                });
+
             modelBuilder.Entity("ChatServe.Api.Data.ChatMessage", b =>
                 {
                     b.HasOne("ChatServe.Api.Data.Customer", null)
@@ -558,9 +606,9 @@ namespace ChatServe.Api.Data.Migrations
 
             modelBuilder.Entity("ChatServe.Api.Data.DashboardUser", b =>
                 {
-                    b.HasOne("ChatServe.Api.Data.Restaurant", null)
+                    b.HasOne("ChatServe.Api.Data.Organization", null)
                         .WithMany()
-                        .HasForeignKey("RestaurantId")
+                        .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -625,6 +673,15 @@ namespace ChatServe.Api.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ChatServe.Api.Data.Restaurant", b =>
+                {
+                    b.HasOne("ChatServe.Api.Data.Organization", null)
+                        .WithMany("Restaurants")
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ChatServe.Api.Data.TableBooking", b =>
                 {
                     b.HasOne("ChatServe.Api.Data.Customer", null)
@@ -643,6 +700,11 @@ namespace ChatServe.Api.Data.Migrations
             modelBuilder.Entity("ChatServe.Api.Data.Order", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("ChatServe.Api.Data.Organization", b =>
+                {
+                    b.Navigation("Restaurants");
                 });
 
             modelBuilder.Entity("ChatServe.Api.Data.Restaurant", b =>

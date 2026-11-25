@@ -68,7 +68,7 @@ Kitchen:  🔔 NEW ORDER #12 (Delivery) ... (WhatsApp to the staff number)
 
 ## 3. Restaurant owner journey (the dashboard)
 
-Open the dashboard → log in. **Admin:** username `admin` (local password `admin`) sees every restaurant. **Restaurant owner:** the username/password the admin created on the **Users** page; they only see their own restaurant. Pages in the left menu:
+Open the dashboard → log in. **Admin:** username `admin` (local password `admin`) sees every client and restaurant and starts on **All clients**. **Client login:** the username/password the admin created for a client (business); it only sees that client's restaurants/branches. Pages in the left menu:
 
 | Page | What you do there |
 |---|---|
@@ -78,9 +78,9 @@ Open the dashboard → log in. **Admin:** username `admin` (local password `admi
 | **Table bookings** | Booking requests from the bot: Confirm / Cancel (optional WhatsApp to customer) |
 | **Customers** | Everyone who messaged: orders, spending, last message; pause/resume bot per customer; CSV |
 | **Menu, deals, FAQs** | The bot's knowledge: dishes + prices (+ available on/off), deals, FAQs, **delivery areas + charges**. Changes apply from the next message |
-| **Restaurant info** | Bot ON/OFF, name, **WhatsApp Phone number ID**, kitchen/staff WhatsApp number, address, timings, minimum order, payment methods, bot tone. Also "New restaurant" (one app can run many restaurants) |
+| **Restaurant info** | Bot ON/OFF, name, **WhatsApp Phone number ID** (admin only), kitchen/staff WhatsApp number, address, timings, minimum order, payment methods, bot tone |
 | **Bot test (simulator)** | Chat with the bot like a customer **without WhatsApp**. Test numbers start with `000`; nothing is sent to real WhatsApp. Kitchen messages show in a yellow card |
-| **Users** (admin only) | Create a login for each restaurant owner (username + password + restaurant), reset a password, delete a login. A reset or delete logs the owner out immediately |
+| **All clients** (admin only) | Every client (business) with its restaurants, today's orders/sales/chats and logins. **+ New client** (business + first restaurant + login in one form), add a restaurant/branch, add/reset/delete logins, rename, **suspend** (logins stop working), move a restaurant to another client, **Open →** any restaurant |
 | **My account** (owners only) | Change your own password |
 | **Settings** (admin only) | WhatsApp keys (Phone number ID, Access token, Verify token, App secret), Anthropic key, AI model, order rules, dashboard password. Saved in the DB, applied without restart. "Connection test" and "Claude test" buttons |
 
@@ -128,8 +128,11 @@ One ChatServe app runs many restaurants. Each restaurant needs **its own WhatsAp
 
 To add a restaurant:
 1. **Meta:** WhatsApp Manager (your ChatServe business portfolio) → Phone numbers → Add phone number → verify by SMS/call → copy the new **Phone number ID**. The number must not be active in the normal WhatsApp app.
-2. **Dashboard (admin):** Restaurant info → New restaurant (name + Phone number ID) → fill in info, menu, delivery areas, staff number → test in the simulator.
-3. **Dashboard (admin):** Users → New owner login for that restaurant → share the username/password with the owner.
+2. **Dashboard (admin):** All clients → **+ New client** (business name, restaurant name + Phone number ID, login username + password). For another branch of an existing client: **+ Add restaurant** on that client's card.
+3. **Open →** the restaurant → fill in Restaurant info, Menu, delivery areas, staff number → Test the bot.
+4. Share the client's username/password privately. Their login only sees their own restaurants; the server blocks everything else (403).
+
+Data model: `Organizations` (clients) → `Restaurants` → everything else (`RestaurantId` on every table). `DashboardUsers` belong to an organization.
 
 Limits today: one Meta access token for all numbers (all numbers must be under your WhatsApp Business Account); restaurants can't connect their own Meta account themselves (needs Meta Embedded Signup / Tech Provider).
 

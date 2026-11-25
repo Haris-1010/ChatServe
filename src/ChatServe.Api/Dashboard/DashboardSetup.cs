@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using ChatServe.Api.Configuration;
 using ChatServe.Api.Data;
 using Microsoft.AspNetCore.Authentication.BearerToken;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 
@@ -23,6 +24,10 @@ public static class DashboardSetup
 
     public static void AddDashboard(this WebApplicationBuilder builder)
     {
+        // Login tokens are encrypted with Data Protection keys. Keep the keys in the database, otherwise every
+        // redeploy (new container on Railway) would log everyone out.
+        builder.Services.AddDataProtection().SetApplicationName("ChatServe").PersistKeysToDbContext<AppDbContext>();
+
         builder.Services.AddAuthentication(BearerTokenDefaults.AuthenticationScheme)
             .AddBearerToken(o => o.BearerTokenExpiration = TimeSpan.FromHours(12));
         builder.Services.AddAuthorization(o =>
@@ -86,6 +91,9 @@ public static class DashboardSetup
                     await Task.Delay(500, ct); // make password guessing slow
                     return Results.Problem("Wrong username or password.", statusCode: StatusCodes.Status401Unauthorized);
                 }
+                if (!await db.Organizations.AnyAsync(o => o.Id == owner.OrganizationId && o.IsActive, ct))
+                    return Results.Problem("This account is suspended. Please contact ChatServe support.",
+                        statusCode: StatusCodes.Status403Forbidden);
                 owner.LastLoginAt = clock.GetUtcNow();
                 await db.SaveChangesAsync(ct);
                 return Results.SignIn(AccessControl.OwnerPrincipal(owner, scheme), authenticationScheme: scheme);
@@ -114,10 +122,11 @@ public static class DashboardSetup
         loggedIn.MapRestaurantEndpoints();
         loggedIn.MapOperationsEndpoints();
 
-        // Admin only: app settings, connection tests, setup status, owner logins.
+        // Admin only: app settings, connection tests, setup status, clients and their logins.
         var admin = api.MapGroup("").RequireAuthorization(AccessControl.AdminPolicy);
         admin.MapSettingsEndpoints();
         admin.MapUserAdminEndpoints();
+        admin.MapClientEndpoints();
 
         // Refreshing on Angular routes (/orders, /menu ...) returns index.html. /api and /webhook are excluded.
         if (HasBuiltDashboard(app.Environment))

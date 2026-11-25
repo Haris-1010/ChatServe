@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChatServe.Api.Data;
 
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options), IDataProtectionKeyContext
 {
+    public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<Restaurant> Restaurants => Set<Restaurant>();
     public DbSet<MenuItem> MenuItems => Set<MenuItem>();
     public DbSet<Deal> Deals => Set<Deal>();
@@ -16,11 +18,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<TableBooking> TableBookings => Set<TableBooking>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<DashboardUser> DashboardUsers => Set<DashboardUser>();
+    /// <summary>Login-token keys, kept in the DB so logins survive redeploys (Railway starts a fresh container each time).</summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<Organization>(e => e.Property(x => x.Name).HasMaxLength(200));
+
         b.Entity<Restaurant>(e =>
         {
+            e.HasOne<Organization>().WithMany(o => o.Restaurants).HasForeignKey(x => x.OrganizationId);
             e.HasIndex(x => x.WhatsAppPhoneNumberId).IsUnique();
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.WhatsAppPhoneNumberId).HasMaxLength(50);
@@ -101,11 +108,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         b.Entity<DashboardUser>(e =>
         {
             e.HasIndex(x => x.Username).IsUnique();
-            e.HasIndex(x => x.RestaurantId);
+            e.HasIndex(x => x.OrganizationId);
             e.Property(x => x.Username).HasMaxLength(50);
             e.Property(x => x.PasswordHash).HasMaxLength(200);
             e.Property(x => x.SecurityStamp).HasMaxLength(40);
-            e.HasOne<Restaurant>().WithMany().HasForeignKey(x => x.RestaurantId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<TableBooking>(e =>

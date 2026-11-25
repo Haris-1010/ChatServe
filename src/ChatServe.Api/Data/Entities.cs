@@ -2,9 +2,24 @@ namespace ChatServe.Api.Data;
 
 // Multi-tenant: every table has a RestaurantId. The restaurant is identified by the webhook's phone_number_id.
 
+/// <summary>
+/// A client (business) that owns one or more restaurants/branches. Owner logins belong to an organization
+/// and see only that organization's restaurants; the admin sees every organization.
+/// </summary>
+public sealed class Organization
+{
+    public int Id { get; set; }
+    public required string Name { get; set; }
+    /// <summary>false = suspended: its owners can't log in (e.g. unpaid). The bot keeps its own ON/OFF per restaurant.</summary>
+    public bool IsActive { get; set; } = true;
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public List<Restaurant> Restaurants { get; set; } = [];
+}
+
 public sealed class Restaurant
 {
     public int Id { get; set; }
+    public int OrganizationId { get; set; }
     public required string Name { get; set; }
 
     /// <summary>Meta's Phone number ID (not the phone number). The webhook uses it to find the restaurant.</summary>
@@ -189,7 +204,7 @@ public sealed class AppSetting
 }
 
 /// <summary>
-/// A restaurant owner's dashboard login. Owners only see and manage their own restaurant.
+/// A client's dashboard login. Owners only see and manage the restaurants of their own organization.
 /// The admin is not stored here: the admin logs in with Dashboard:AdminPassword.
 /// </summary>
 public sealed class DashboardUser
@@ -197,7 +212,7 @@ public sealed class DashboardUser
     public int Id { get; set; }
     public required string Username { get; set; }          // stored lowercase, unique
     public required string PasswordHash { get; set; }      // ASP.NET Core PasswordHasher (PBKDF2)
-    public int RestaurantId { get; set; }
+    public int OrganizationId { get; set; }
     /// <summary>Changes on password reset, so old login tokens stop working.</summary>
     public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
     public DateTimeOffset CreatedAt { get; set; }

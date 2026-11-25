@@ -1,6 +1,6 @@
 # WhatsApp AI Agent: Project Context (ChatServe)
 
-> **For Claude in a new session:** This file is the full context of the project by Talha (full stack .NET developer, Lahore). Continue the work from here. Talk with Talha in **Roman Urdu**. Don't re-explain earlier discussions; start directly from the **"Current status / Next step"** section.
+> **For Claude in a new session:** Also read `docs/SESSION_HANDOVER.md` (latest session). This file is the full context of the project by Talha (full stack .NET developer, Lahore). Continue the work from here. Talk with Talha in **Roman Urdu**. Don't re-explain earlier discussions; start directly from the **"Current status / Next step"** section.
 
 ---
 
@@ -20,7 +20,7 @@ A **WhatsApp AI auto-reply agent**, sold as a SaaS product to restaurants and e-
 | AI | **Claude API**, model **Claude Haiku 5.5** (cheap and fast). Key from console.anthropic.com. Talha's Claude Pro plan doesn't include the API; API billing is separate |
 | Database | **PostgreSQL** + EF Core (`UseNpgsql`), because Railway/Render don't offer SQL Server |
 | Dashboard | **Angular** |
-| Hosting | Backend: **Railway or Render (paid plan, Docker)**. The free plan sleeps, which delays the webhook. Dashboard: **Vercel (free)** |
+| Hosting | **Railway** (Docker, API + dashboard on one URL) + Railway PostgreSQL. See `docs/DEPLOY_RAILWAY.md` |
 | Architecture | **Multi-tenant SaaS**: one app, many restaurants. The restaurant is identified by the `phone_number_id` in the webhook payload; every table has a `RestaurantId` |
 | Language | **English by default** for the whole product (dashboard, messages, docs, code). The bot replies in the customer's language if they write in something other than English (e.g. Roman Urdu) |
 | Project name | Tentatively **"ChatServe"** (Talha hasn't confirmed it as final) |
@@ -83,6 +83,7 @@ Customer (WhatsApp) → Meta Cloud API → webhook (ASP.NET Core)
 - ✅ **Phase 3 complete** (24 Nov 2026): order tools, server-side totals, WhatsApp ticket to the kitchen on "confirm", order status, table booking, human handover. Details in `docs/PHASE3_PROGRESS.md`
 - ✅ **Most of Phase 5 (dashboard)** (24 Nov 2026): Angular 22 dashboard (`dashboard/`) + admin API (`src/ChatServe.Api/Dashboard/`). Settings from the UI (in the DB, applied immediately), menu/deals/FAQs/zones, orders, chats + staff reply + bot pause, bookings, customers CSV, bot simulator. Details in `docs/PHASE5_PROGRESS.md`
 - ✅ **English by default** (24 Nov 2026): dashboard, settings, customer/kitchen messages, AI default reply language, demo data, docs and code comments
+- ✅ **Railway + multi-client portal** (25 Nov 2026): `railway.json` + `docs/DEPLOY_RAILWAY.md`; clients (organizations) with many restaurants each, client logins see only their own restaurants (server-side 403), admin **All clients** page with today's numbers per client/restaurant, suspend client; login keys stored in the DB so redeploys don't log people out
 - ⏭️ **Next: Phase 4** (customer labels, no-shows, blacklist), then labels/filters on the dashboard
 - ⏳ **Talha's tasks:** Meta app setup (see README), Anthropic API key, share `D:\Development\New folder` with the Claude desktop app (Settings > Claude Code > Remote Control) so the code can be copied there
 - GitHub: `Haris-1010/ChatServe` (public). The dashboard work still has to go there from a branch/zip

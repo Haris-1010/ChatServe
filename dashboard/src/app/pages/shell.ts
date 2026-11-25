@@ -13,56 +13,81 @@ import { errorText, Toasts } from '../core/toast';
       <aside class="sidebar">
         <div class="brand"><span class="logo">💬</span> ChatServe</div>
 
+        <nav (click)="navOpen.set(false)">
+          @if (auth.isAdmin()) {
+            <div class="nav-label">Admin</div>
+            <a routerLink="/clients" routerLinkActive="active"><span>🏢</span> All clients</a>
+            <a routerLink="/settings" routerLinkActive="active"><span>⚙️</span> Settings</a>
+          }
+        </nav>
+
         @if (restaurants.list().length > 1) {
           <label class="field compact">
-            <span>Restaurant</span>
+            <span>{{ auth.isAdmin() ? 'Restaurant you are viewing' : 'Branch' }}</span>
             <select [ngModel]="restaurants.id()" (ngModelChange)="restaurants.select(+$event)">
-              @for (r of restaurants.list(); track r.id) {
-                <option [value]="r.id">{{ r.name }}{{ r.isBotEnabled ? '' : ' (bot OFF)' }}</option>
+              @if (auth.isAdmin()) {
+                @for (g of restaurants.groups(); track g.name) {
+                  <optgroup [label]="g.name">
+                    @for (r of g.items; track r.id) {
+                      <option [value]="r.id">{{ r.name }}{{ r.isBotEnabled ? '' : ' (bot OFF)' }}</option>
+                    }
+                  </optgroup>
+                }
+              } @else {
+                @for (r of restaurants.list(); track r.id) {
+                  <option [value]="r.id">{{ r.name }}{{ r.isBotEnabled ? '' : ' (bot OFF)' }}</option>
+                }
               }
             </select>
           </label>
         }
 
+        @if (restaurants.current) {
         <nav (click)="navOpen.set(false)">
-          <div class="nav-label">Daily work</div>
-          <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"><span>📊</span> Overview</a>
+          <div class="nav-label">Every day</div>
+          <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"><span>📊</span> Home</a>
           <a routerLink="/orders" routerLinkActive="active"><span>🧾</span> Orders</a>
           <a routerLink="/chats" routerLinkActive="active"><span>💬</span> Chats</a>
-          <a routerLink="/bookings" routerLinkActive="active"><span>📅</span> Table bookings</a>
+          <a routerLink="/bookings" routerLinkActive="active"><span>📅</span> Bookings</a>
           <a routerLink="/customers" routerLinkActive="active"><span>👥</span> Customers</a>
-          <div class="nav-label">Bot training</div>
-          <a routerLink="/menu" routerLinkActive="active"><span>🍛</span> Menu, deals, FAQs</a>
+          <div class="nav-label">Bot setup</div>
+          <a routerLink="/menu" routerLinkActive="active"><span>🍛</span> Menu &amp; FAQs</a>
           <a routerLink="/restaurant" routerLinkActive="active"><span>🏪</span> Restaurant info</a>
-          <a routerLink="/simulator" routerLinkActive="active"><span>🧪</span> Bot test (simulator)</a>
-          @if (auth.isAdmin()) {
-            <div class="nav-label">Setup</div>
-            <a routerLink="/users" routerLinkActive="active"><span>🔑</span> Users (owner logins)</a>
-            <a routerLink="/settings" routerLinkActive="active"><span>⚙️</span> Settings</a>
-          } @else {
+          <a routerLink="/simulator" routerLinkActive="active"><span>🧪</span> Test the bot</a>
+          @if (!auth.isAdmin()) {
             <div class="nav-label">Account</div>
             <a routerLink="/account" routerLinkActive="active"><span>🔒</span> My account</a>
           }
         </nav>
+        }
 
-        @if (auth.me(); as m) { <div class="muted small signed-in">Signed in as <b>{{ m.username }}</b>{{ m.role === 'admin' ? ' (admin)' : '' }}</div> }
+        @if (auth.me(); as m) {
+          <div class="muted small signed-in">Signed in as <b>{{ m.username }}</b>
+            {{ m.role === 'admin' ? '(admin: sees all clients)' : m.organizationName ? '· ' + m.organizationName : '' }}</div>
+        }
         <button class="btn ghost block logout" (click)="logout()">Logout</button>
       </aside>
 
       <div class="main">
         <header class="topbar">
           <button class="btn ghost menu-btn" (click)="navOpen.set(!navOpen())" aria-label="Menu">☰</button>
-          <div class="topbar-title">{{ restaurants.current?.name ?? 'ChatServe' }}</div>
-          @if (restaurants.current; as r) {
+          <div class="topbar-title">
+            @if (onAdminPage()) { Admin }
+            @else {
+              @if (auth.isAdmin() && restaurants.current; as r) { <span class="muted">{{ r.organizationName }} ›</span> }
+              {{ restaurants.current?.name ?? 'ChatServe' }}
+            }
+          </div>
+          @if (!onAdminPage() && restaurants.current; as r) {
             <span class="pill" [class.ok]="r.isBotEnabled" [class.warn]="!r.isBotEnabled">Bot {{ r.isBotEnabled ? 'ON' : 'OFF' }}</span>
           }
         </header>
         <main class="content">
           @if (loaded()) {
-            @if (restaurants.list().length === 0 && auth.isAdmin()) {
+            @if (restaurants.list().length === 0 && auth.isAdmin() && !onAdminPage()) {
               <div class="card empty">
                 <h2>No restaurant yet</h2>
-                <p class="muted">Add your WhatsApp <b>Phone number ID</b> in Settings and restart the app (a demo restaurant is created automatically), or create a new restaurant on the <a routerLink="/restaurant">Restaurant info</a> page.</p>
+                <p class="muted">Go to <a routerLink="/clients">All clients</a> and click <b>+ New client</b> to add the first restaurant.</p>
               </div>
             }
             <router-outlet />
@@ -91,6 +116,8 @@ export class Shell implements OnInit {
       this.loaded.set(true);
     }
   }
+
+  onAdminPage() { return this.router.url.startsWith('/clients') || this.router.url.startsWith('/settings'); }
 
   logout() {
     this.auth.clear();
