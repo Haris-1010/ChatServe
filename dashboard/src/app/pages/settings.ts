@@ -62,7 +62,7 @@ import { errorText, Toasts } from '../core/toast';
                     </div>
                   }
                   @default {
-                    <input [type]="s.kind === 'number' ? 'number' : 'text'" [attr.list]="s.options ? 'opt-' + s.key : null"
+                    <input [type]="s.kind === 'number' || s.kind === 'decimal' ? 'number' : 'text'" [attr.step]="s.kind === 'decimal' ? 'any' : null" [attr.list]="s.options ? 'opt-' + s.key : null"
                       [ngModel]="value(s)" (ngModelChange)="set(s, $event)" />
                     @if (s.options) { <datalist [id]="'opt-' + s.key">@for (o of s.options; track o) { <option [value]="o"></option> }</datalist> }
                   }

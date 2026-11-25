@@ -8,6 +8,10 @@ import { errorText, Toasts } from '../core/toast';
 @Component({
   selector: 'app-shell',
   imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule],
+  styles: [`
+    .usage-banner { display: block; margin-bottom: 14px; padding: 10px 14px; border-radius: 10px; text-decoration: none;
+      background: rgba(245, 166, 35, .14); border: 1px solid rgba(245, 166, 35, .45); color: inherit; font-size: 14px; }
+  `],
   template: `
     <div class="layout" [class.nav-open]="navOpen()">
       <aside class="sidebar">
@@ -17,6 +21,7 @@ import { errorText, Toasts } from '../core/toast';
           @if (auth.isAdmin()) {
             <div class="nav-label">Admin</div>
             <a routerLink="/clients" routerLinkActive="active"><span>🏢</span> All clients</a>
+            <a routerLink="/usage" routerLinkActive="active"><span>📊</span> AI usage</a>
             <a routerLink="/settings" routerLinkActive="active"><span>⚙️</span> Settings</a>
           }
         </nav>
@@ -57,6 +62,7 @@ import { errorText, Toasts } from '../core/toast';
           <a routerLink="/simulator" routerLinkActive="active"><span>🧪</span> Test the bot</a>
           @if (!auth.isAdmin()) {
             <div class="nav-label">Account</div>
+            <a routerLink="/usage" routerLinkActive="active"><span>📊</span> AI usage</a>
             <a routerLink="/account" routerLinkActive="active"><span>🔒</span> My account</a>
           }
         </nav>
@@ -84,6 +90,9 @@ import { errorText, Toasts } from '../core/toast';
           }
         </header>
         <main class="content">
+          @if (usageWarning(); as w) {
+            <a class="usage-banner" routerLink="/usage">⚠️ {{ w }}</a>
+          }
           @if (loaded()) {
             @if (restaurants.list().length === 0 && auth.isAdmin() && !onAdminPage()) {
               <div class="card empty">
@@ -106,11 +115,13 @@ export class Shell implements OnInit {
   private toasts = inject(Toasts);
   navOpen = signal(false);
   loaded = signal(false);
+  usageWarning = signal('');
 
   async ngOnInit() {
     try {
       if (!this.auth.me()) this.auth.me.set(await this.api.me());
       await this.restaurants.load();
+      this.checkUsage();
     } catch (e) {
       this.toasts.error(errorText(e));
     } finally {
@@ -118,7 +129,22 @@ export class Shell implements OnInit {
     }
   }
 
-  onAdminPage() { return this.router.url.startsWith('/clients') || this.router.url.startsWith('/settings'); }
+  onAdminPage() {
+    const u = this.router.url;
+    return u.startsWith('/clients') || u.startsWith('/settings') || (this.auth.isAdmin() && u.startsWith('/usage'));
+  }
+
+  /** A banner when a client is near or over its monthly AI limit (only a warning; the bot keeps working). */
+  private async checkUsage() {
+    try {
+      const u = await this.api.usage();
+      const near = u.clients.filter(c => c.warning);
+      if (near.length === 0) return;
+      this.usageWarning.set(this.auth.isAdmin()
+        ? `${near.length} client(s) near or over their monthly AI limit: ${near.map(c => `${c.name} ${c.percent}%`).join(', ')}`
+        : `You have used ${near[0].percent}% of this month's AI limit.`);
+    } catch { /* the banner is optional */ }
+  }
 
   logout() {
     this.auth.clear();

@@ -13,6 +13,10 @@ public sealed class Organization
     /// <summary>false = suspended: its owners can't log in (e.g. unpaid). The bot keeps its own ON/OFF per restaurant.</summary>
     public bool IsActive { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>The client's monthly AI allowance in PKR (from their package). Only a warning when it runs out; the bot keeps working.</summary>
+    public decimal? MonthlyAiBudget { get; set; }
+
     public List<Restaurant> Restaurants { get; set; } = [];
 }
 
@@ -125,6 +129,7 @@ public sealed class ChatMessage
     public int? InputTokens { get; set; }
     public int? OutputTokens { get; set; }
     public int? CacheReadTokens { get; set; }
+    public int? CacheWriteTokens { get; set; }
 }
 
 public enum OrderType { Delivery = 0, Takeaway = 1, DineIn = 2 }
@@ -223,4 +228,17 @@ public sealed class DashboardUser
     public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
+}
+
+/// <summary>AI calls that are not a bot reply (e.g. reading a training screenshot), so they count in the usage report too.</summary>
+public sealed class AiUsageLog
+{
+    public long Id { get; set; }
+    public int RestaurantId { get; set; }
+    public required string Kind { get; set; }       // "training-screenshot"
+    public int InputTokens { get; set; }
+    public int OutputTokens { get; set; }
+    public int CacheReadTokens { get; set; }
+    public int CacheWriteTokens { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 }

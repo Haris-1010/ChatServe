@@ -7,9 +7,11 @@ namespace ChatServe.Api.Ai;
 /// <summary>Reads the text of a WhatsApp chat screenshot (for bot training), so owners can teach the bot from old chats.</summary>
 public interface IChatScreenshotReader
 {
-    /// <summary>The conversation as "Customer: ..." / "Restaurant: ..." lines, or null if no chat was found.</summary>
-    Task<string?> ReadAsync(byte[] image, string mediaType, CancellationToken ct);
+    /// <summary>The conversation as "Customer: ..." / "Restaurant: ..." lines (Text is null if no chat was found), plus the tokens used.</summary>
+    Task<ScreenshotText> ReadAsync(byte[] image, string mediaType, CancellationToken ct);
 }
+
+public sealed record ScreenshotText(string? Text, long InputTokens, long OutputTokens);
 
 public sealed class ClaudeChatScreenshotReader(AnthropicClientProvider clients, IOptionsMonitor<AiOptions> options) : IChatScreenshotReader
 {
@@ -24,7 +26,7 @@ public sealed class ClaudeChatScreenshotReader(AnthropicClientProvider clients, 
         "Leave out times, dates, ticks, the contact name bar, phone numbers and the keyboard. " +
         "Reply with only the conversation lines. If there is no chat in the image, reply with exactly: NO_CHAT";
 
-    public async Task<string?> ReadAsync(byte[] image, string mediaType, CancellationToken ct)
+    public async Task<ScreenshotText> ReadAsync(byte[] image, string mediaType, CancellationToken ct)
     {
         var opts = options.CurrentValue;
         var response = await clients.Get().Messages.Create(new MessageCreateParams
@@ -48,6 +50,8 @@ public sealed class ClaudeChatScreenshotReader(AnthropicClientProvider clients, 
         }, cancellationToken: ct);
 
         var text = string.Join("\n", response.Content.Select(b => b.Value).OfType<TextBlock>().Select(t => t.Text)).Trim();
-        return text.Length == 0 || text.Contains("NO_CHAT", StringComparison.Ordinal) ? null : text;
+        return new ScreenshotText(
+            text.Length == 0 || text.Contains("NO_CHAT", StringComparison.Ordinal) ? null : text,
+            response.Usage.InputTokens, response.Usage.OutputTokens);
     }
 }

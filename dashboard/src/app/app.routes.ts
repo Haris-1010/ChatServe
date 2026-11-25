@@ -22,6 +22,7 @@ export const routes: Routes = [
       { path: 'settings', canActivate: [adminGuard], loadComponent: () => import('./pages/settings').then(m => m.SettingsPage) },
       { path: 'clients', canActivate: [adminGuard], loadComponent: () => import('./pages/clients').then(m => m.ClientsPage) },
       { path: 'users', redirectTo: 'clients' },
+      { path: 'usage', loadComponent: () => import('./pages/usage').then(m => m.UsagePage) },
       { path: 'account', loadComponent: () => import('./pages/account').then(m => m.AccountPage) },
     ],
   },

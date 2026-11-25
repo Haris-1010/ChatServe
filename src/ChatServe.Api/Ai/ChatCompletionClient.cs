@@ -8,7 +8,7 @@ namespace ChatServe.Api.Ai;
 public sealed record ChatTurn(bool FromCustomer, string Text);
 
 public sealed record AiResult(
-    string? Text, bool Refused, long InputTokens, long OutputTokens, long CacheReadTokens, int ToolCalls = 0);
+    string? Text, bool Refused, long InputTokens, long OutputTokens, long CacheReadTokens, int ToolCalls = 0, long CacheWriteTokens = 0);
 
 /// <summary>A tool definition. <see cref="JsonSchema"/> is the full JSON schema (type, properties, required, additionalProperties).</summary>
 public sealed record AiTool(string Name, string Description, string JsonSchema);
@@ -87,7 +87,7 @@ public sealed class ClaudeChatCompletionClient(
         // Haiku 5.5 doesn't support forced tool_choice: default "auto" + strict schema.
         List<ToolUnion>? toolDefs = tools.Count == 0 || executor is null ? null : tools.Select(ToSdkTool).ToList();
 
-        long input = 0, output = 0, cacheRead = 0;
+        long input = 0, output = 0, cacheRead = 0, cacheWrite = 0;
         var toolCalls = 0;
         var maxRounds = Math.Max(1, opts.MaxToolRounds);
 
@@ -111,19 +111,20 @@ public sealed class ClaudeChatCompletionClient(
             input += response.Usage.InputTokens;
             output += response.Usage.OutputTokens;
             cacheRead += response.Usage.CacheReadInputTokens ?? 0;
+            cacheWrite += response.Usage.CacheCreationInputTokens ?? 0;
 
             if (response.StopReason == "refusal")
-                return new AiResult(null, true, input, output, cacheRead, toolCalls); // no server-side fallback on Haiku
+                return new AiResult(null, true, input, output, cacheRead, toolCalls, cacheWrite); // no server-side fallback on Haiku
 
             var text = string.Join("\n", response.Content.Select(b => b.Value).OfType<TextBlock>().Select(t => t.Text)).Trim();
 
             if (response.StopReason != "tool_use" || executor is null)
-                return new AiResult(string.IsNullOrWhiteSpace(text) ? null : text, false, input, output, cacheRead, toolCalls);
+                return new AiResult(string.IsNullOrWhiteSpace(text) ? null : text, false, input, output, cacheRead, toolCalls, cacheWrite);
 
             if (round + 1 >= maxRounds)
             {
                 logger.LogWarning("Tool loop stopped after {Rounds} rounds", maxRounds);
-                return new AiResult(null, false, input, output, cacheRead, toolCalls);
+                return new AiResult(null, false, input, output, cacheRead, toolCalls, cacheWrite);
             }
 
             // The full assistant reply (thinking + tool_use) must be sent back, then all tool results in one user message.

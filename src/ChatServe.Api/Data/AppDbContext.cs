@@ -19,12 +19,24 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<TableBooking> TableBookings => Set<TableBooking>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<DashboardUser> DashboardUsers => Set<DashboardUser>();
+    public DbSet<AiUsageLog> AiUsageLogs => Set<AiUsageLog>();
     /// <summary>Login-token keys, kept in the DB so logins survive redeploys (Railway starts a fresh container each time).</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
-        b.Entity<Organization>(e => e.Property(x => x.Name).HasMaxLength(200));
+        b.Entity<Organization>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.MonthlyAiBudget).HasPrecision(12, 2);
+        });
+
+        b.Entity<AiUsageLog>(e =>
+        {
+            e.HasOne<Restaurant>().WithMany().HasForeignKey(x => x.RestaurantId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.Kind).HasMaxLength(40);
+            e.HasIndex(x => new { x.RestaurantId, x.CreatedAt });
+        });
 
         b.Entity<Restaurant>(e =>
         {
@@ -69,6 +81,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         b.Entity<ChatMessage>(e =>
         {
             e.HasIndex(x => new { x.CustomerId, x.CreatedAt });
+            e.HasIndex(x => new { x.RestaurantId, x.CreatedAt }); // usage report
             e.HasIndex(x => x.WhatsAppMessageId);
             e.Property(x => x.Role).HasConversion<string>().HasMaxLength(10);
             e.HasOne<Restaurant>().WithMany().HasForeignKey(x => x.RestaurantId);

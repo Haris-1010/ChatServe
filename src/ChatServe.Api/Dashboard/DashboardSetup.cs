@@ -127,6 +127,7 @@ public static class DashboardSetup
         admin.MapSettingsEndpoints();
         admin.MapUserAdminEndpoints();
         admin.MapClientEndpoints();
+        loggedIn.MapUsageEndpoints(admin);
 
         // Refreshing on Angular routes (/orders, /menu ...) returns index.html. /api and /webhook are excluded.
         if (HasBuiltDashboard(app.Environment))

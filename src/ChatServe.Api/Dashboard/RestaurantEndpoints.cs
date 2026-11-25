@@ -110,8 +110,8 @@ public static class RestaurantEndpoints
 
         // Turns one file into example text for the owner to review (nothing is saved here):
         // a WhatsApp "Export chat" .txt file, or a chat screenshot that the AI reads.
-        one.MapPost("/training/import", async (TrainingImport input, IChatScreenshotReader reader,
-            ILoggerFactory logs, CancellationToken ct) =>
+        one.MapPost("/training/import", async (int rid, TrainingImport input, IChatScreenshotReader reader,
+            AppDbContext db, TimeProvider clock, ILoggerFactory logs, CancellationToken ct) =>
         {
             if (!string.IsNullOrEmpty(input.Text))
                 return Results.Ok(new { Text = TrainingText.Clean(TrainingText.FromWhatsAppExport(input.Text)) ?? "" });
@@ -128,10 +128,16 @@ public static class RestaurantEndpoints
 
             try
             {
-                var text = await reader.ReadAsync(image, input.MediaType, ct);
-                return text is null
+                var read = await reader.ReadAsync(image, input.MediaType, ct);
+                db.AiUsageLogs.Add(new AiUsageLog
+                {
+                    RestaurantId = rid, Kind = "training-screenshot", CreatedAt = clock.GetUtcNow(),
+                    InputTokens = (int)read.InputTokens, OutputTokens = (int)read.OutputTokens,
+                });
+                await db.SaveChangesAsync(ct);
+                return read.Text is null
                     ? Bad($"No chat found in {input.FileName ?? "the image"}.")
-                    : Results.Ok(new { Text = TrainingText.Clean(text) ?? "" });
+                    : Results.Ok(new { Text = TrainingText.Clean(read.Text) ?? "" });
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

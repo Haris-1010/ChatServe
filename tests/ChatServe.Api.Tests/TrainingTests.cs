@@ -11,10 +11,10 @@ public sealed class FakeScreenshotReader : IChatScreenshotReader
     public string? Result { get; set; } = "Customer: menu bhej dein\nRestaurant: Ji zaroor sir!";
     public int Calls { get; private set; }
 
-    public Task<string?> ReadAsync(byte[] image, string mediaType, CancellationToken ct)
+    public Task<ScreenshotText> ReadAsync(byte[] image, string mediaType, CancellationToken ct)
     {
         Calls++;
-        return Task.FromResult(Result);
+        return Task.FromResult(new ScreenshotText(Result, 1500, 200));
     }
 }
 

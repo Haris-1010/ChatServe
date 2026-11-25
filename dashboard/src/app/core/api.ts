@@ -66,7 +66,7 @@ export interface StatusCheck { name: string; state: 'ok' | 'warn' | 'error'; mes
 export interface Status { checks: StatusCheck[]; webhookUrl: string; environment: string; }
 
 export interface Setting {
-  key: string; group: string; label: string; kind: 'text' | 'secret' | 'bool' | 'number' | 'select' | 'textarea';
+  key: string; group: string; label: string; kind: 'text' | 'secret' | 'bool' | 'number' | 'select' | 'textarea' | 'decimal';
   help: string; options: string[] | null; value: string | null; isSet: boolean; hint: string | null;
   source: 'dashboard' | 'config' | 'default';
 }
@@ -114,6 +114,17 @@ export const ORDER_TYPE_LABEL: Record<OrderType, string> = { Delivery: 'Delivery
 
 // ---------- API ----------
 
+export interface UsageLine {
+  replies: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number;
+  costUsd: number; costPkr: number;
+}
+export interface UsageClient {
+  id: number; name: string; isActive: boolean; monthlyAiBudget: number | null; remaining: number | null;
+  percent: number | null; warning: boolean; overLimit: boolean; usage: UsageLine;
+  restaurants: { id: number; name: string; usage: UsageLine }[];
+}
+export interface UsageReport { month: string; pkrPerUsd: number; warnAtPercent: number; total: UsageLine; clients: UsageClient[]; }
+
 export interface Training { text: string | null; maxLength: number; }
 export interface TrainingFile { fileName: string; text?: string; imageBase64?: string; mediaType?: string; }
 
@@ -156,6 +167,8 @@ export class Api {
   }
   restaurant(rid: number) { return this.get<RestaurantProfile>(`/api/restaurants/${rid}`); }
   saveRestaurant(rid: number, p: RestaurantProfile) { return this.put<RestaurantProfile>(`/api/restaurants/${rid}`, p); }
+  usage(month?: string) { return this.get<UsageReport>('/api/usage', month ? { month } : undefined); }
+  setBudget(clientId: number, monthlyAiBudget: number | null) { return this.put<{ id: number; monthlyAiBudget: number | null }>(`/api/clients/${clientId}/budget`, { monthlyAiBudget }); }
   training(rid: number) { return this.get<Training>(`/api/restaurants/${rid}/training`); }
   saveTraining(rid: number, text: string) { return this.put<Training>(`/api/restaurants/${rid}/training`, { text }); }
   importTraining(rid: number, file: TrainingFile) { return this.post<{ text: string }>(`/api/restaurants/${rid}/training/import`, file); }

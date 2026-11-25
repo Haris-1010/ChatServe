@@ -45,6 +45,7 @@ builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(DatabaseUrl.ToConne
 
 // ---- AI (Claude) ----
 builder.Services.AddOptions<AiOptions>().Bind(builder.Configuration.GetSection(AiOptions.SectionName));
+builder.Services.AddOptions<UsageOptions>().Bind(builder.Configuration.GetSection(UsageOptions.SectionName));
 builder.Services.AddSingleton<AnthropicClientProvider>(); // new client when the key changes from the dashboard
 builder.Services.AddSingleton<IChatCompletionClient, ClaudeChatCompletionClient>();
 builder.Services.AddSingleton<IChatScreenshotReader, ClaudeChatScreenshotReader>();

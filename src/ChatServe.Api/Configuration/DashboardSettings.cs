@@ -22,7 +22,7 @@ public sealed class DashboardSettingsProvider : ConfigurationProvider, IConfigur
     }
 }
 
-public enum SettingKind { Text, Secret, Bool, Number, Select, TextArea }
+public enum SettingKind { Text, Secret, Bool, Number, Select, TextArea, Decimal }
 
 public sealed record SettingDefinition(
     string Key,
@@ -64,6 +64,19 @@ public static class SettingsCatalog
             "How many past messages per customer the AI remembers. Default 20."),
         new("Anthropic:MaxToolRounds", "AI (Claude)", "Max tool rounds", SettingKind.Number,
             "How many times the AI can use tools for one message. Default 5."),
+
+        new("Usage:InputUsdPerMillion", "AI cost", "Input price ($ per 1M tokens)", SettingKind.Decimal,
+            "From Anthropic's pricing page for the model above. claude-haiku-5-5: 0.10, claude-sonnet-5-5: 2, claude-opus-5-5: 4."),
+        new("Usage:OutputUsdPerMillion", "AI cost", "Output price ($ per 1M tokens)", SettingKind.Decimal,
+            "claude-haiku-5-5: 0.50, claude-sonnet-5-5: 10, claude-opus-5-5: 20."),
+        new("Usage:CacheReadUsdPerMillion", "AI cost", "Cache read price ($ per 1M tokens)", SettingKind.Decimal,
+            "Cached menu/instructions re-used between messages. Check the pricing page; default 0.01 (10% of the Haiku input price)."),
+        new("Usage:CacheWriteUsdPerMillion", "AI cost", "Cache write price ($ per 1M tokens)", SettingKind.Decimal,
+            "Usually 1.25 x the input price. Default 0.125."),
+        new("Usage:PkrPerUsd", "AI cost", "Dollar rate (PKR per $)", SettingKind.Decimal,
+            "Used to show AI cost in rupees. Default 280."),
+        new("Usage:WarnAtPercent", "AI cost", "Warn at (% of monthly limit)", SettingKind.Number,
+            "Clients over this share of their monthly AI limit are highlighted. Default 80."),
 
         new("Bot:UseAi", "Bot", "Reply with AI", SettingKind.Bool,
             "OFF = a simple welcome message (no AI cost). ON = Claude answers from the menu."),
@@ -147,6 +160,10 @@ public sealed class SettingsStore(AppDbContext db, DashboardSettingsProvider pro
                 if (!int.TryParse(value, out var n) || n < 0)
                     throw new ArgumentException($"{def.Label}: enter a valid number.");
                 return n.ToString();
+            case SettingKind.Decimal:
+                if (!decimal.TryParse(value, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var d) || d < 0)
+                    throw new ArgumentException($"{def.Label}: enter a valid number, e.g. 0.10.");
+                return d.ToString(System.Globalization.CultureInfo.InvariantCulture);
             case SettingKind.Select:
                 if (def.Options is not null && !def.Options.Contains(value))
                     throw new ArgumentException($"{def.Label}: choose one of: {string.Join(", ", def.Options)}.");

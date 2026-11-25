@@ -137,6 +137,7 @@ public sealed class ClaudeReplyGenerator(
             InputTokens = (int?)result?.InputTokens,
             OutputTokens = (int?)result?.OutputTokens,
             CacheReadTokens = (int?)result?.CacheReadTokens,
+            CacheWriteTokens = (int?)result?.CacheWriteTokens,
         };
         db.ChatMessages.Add(botMessage);
         await db.SaveChangesAsync(ct);
