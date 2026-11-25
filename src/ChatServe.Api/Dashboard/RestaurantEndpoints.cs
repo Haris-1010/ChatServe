@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ChatServe.Api.Ai;
 using ChatServe.Api.Data;
 using ChatServe.Api.Orders;
 using Microsoft.EntityFrameworkCore;
@@ -87,6 +88,56 @@ public static class RestaurantEndpoints
             r.StaffWhatsAppNumber = staff;
             await db.SaveChangesAsync(ct);
             return Results.Ok(ToProfile(r));
+        });
+
+        // ---- Bot training (example chats) ----
+        one.MapGet("/training", async (int rid, AppDbContext db, CancellationToken ct) =>
+            await db.Restaurants.AsNoTracking().Where(r => r.Id == rid)
+                .Select(r => new TrainingDto(r.TrainingExamples, TrainingText.MaxLength)).FirstOrDefaultAsync(ct)
+                is { } dto ? Results.Ok(dto) : Results.NotFound());
+
+        one.MapPut("/training", async (int rid, TrainingInput input, AppDbContext db, CancellationToken ct) =>
+        {
+            var r = await db.Restaurants.FirstOrDefaultAsync(x => x.Id == rid, ct);
+            if (r is null) return Results.NotFound();
+            var text = TrainingText.Clean(input.Text);
+            if (text is not null && text.Length > TrainingText.MaxLength)
+                return Bad($"Too long ({text.Length:N0} characters). Keep the best examples, at most {TrainingText.MaxLength:N0} characters.");
+            r.TrainingExamples = text;
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(new TrainingDto(text, TrainingText.MaxLength));
+        });
+
+        // Turns one file into example text for the owner to review (nothing is saved here):
+        // a WhatsApp "Export chat" .txt file, or a chat screenshot that the AI reads.
+        one.MapPost("/training/import", async (TrainingImport input, IChatScreenshotReader reader,
+            ILoggerFactory logs, CancellationToken ct) =>
+        {
+            if (!string.IsNullOrEmpty(input.Text))
+                return Results.Ok(new { Text = TrainingText.Clean(TrainingText.FromWhatsAppExport(input.Text)) ?? "" });
+
+            if (string.IsNullOrEmpty(input.ImageBase64) || input.MediaType is null)
+                return Bad("Choose a .txt chat export or a screenshot.");
+            if (!ClaudeChatScreenshotReader.MediaTypes.Contains(input.MediaType))
+                return Bad("Screenshots must be JPG, PNG, WEBP or GIF.");
+            byte[] image;
+            try { image = Convert.FromBase64String(input.ImageBase64); }
+            catch (FormatException) { return Bad("The image could not be read."); }
+            if (image.Length > 5 * 1024 * 1024)
+                return Bad("The screenshot is too large (max 5 MB).");
+
+            try
+            {
+                var text = await reader.ReadAsync(image, input.MediaType, ct);
+                return text is null
+                    ? Bad($"No chat found in {input.FileName ?? "the image"}.")
+                    : Results.Ok(new { Text = TrainingText.Clean(text) ?? "" });
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logs.CreateLogger("Training").LogError(ex, "Reading screenshot {File} failed", input.FileName);
+                return Bad("The AI could not read this screenshot. Check the Anthropic API key and credits in Settings.");
+            }
         });
 
         // ---- Menu ----
@@ -310,4 +361,8 @@ public static class RestaurantEndpoints
             z.IsActive = IsActive;
         }
     }
+
+    public sealed record TrainingDto(string? Text, int MaxLength);
+    public sealed record TrainingInput(string? Text);
+    public sealed record TrainingImport(string? FileName, string? Text, string? ImageBase64, string? MediaType);
 }

@@ -22,6 +22,7 @@ public class DashboardApiTests
     {
         public FakeWhatsAppClient WhatsApp { get; } = new();
         public FakeChatCompletionClient Ai { get; } = new();
+        public FakeScreenshotReader Screenshots { get; } = new();
         private readonly string _dbName = Guid.NewGuid().ToString();
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -37,6 +38,8 @@ public class DashboardApiTests
                 s.AddSingleton<IWhatsAppClient>(WhatsApp);
                 s.RemoveAll<IChatCompletionClient>();
                 s.AddSingleton<IChatCompletionClient>(Ai);
+                s.RemoveAll<IChatScreenshotReader>();
+                s.AddSingleton<IChatScreenshotReader>(Screenshots);
                 s.RemoveAll<DbContextOptions<AppDbContext>>();
                 s.RemoveAll<AppDbContext>();
                 s.AddDbContext<AppDbContext>(o => o.UseInMemoryDatabase(_dbName));

@@ -17,6 +17,7 @@ export const routes: Routes = [
       { path: 'menu', loadComponent: () => import('./pages/menu').then(m => m.MenuPage) },
       { path: 'bookings', loadComponent: () => import('./pages/bookings').then(m => m.BookingsPage) },
       { path: 'customers', loadComponent: () => import('./pages/customers').then(m => m.CustomersPage) },
+      { path: 'training', loadComponent: () => import('./pages/training').then(m => m.TrainingPage) },
       { path: 'restaurant', loadComponent: () => import('./pages/restaurant').then(m => m.RestaurantPage) },
       { path: 'settings', canActivate: [adminGuard], loadComponent: () => import('./pages/settings').then(m => m.SettingsPage) },
       { path: 'clients', canActivate: [adminGuard], loadComponent: () => import('./pages/clients').then(m => m.ClientsPage) },

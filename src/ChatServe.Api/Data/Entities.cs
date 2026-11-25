@@ -41,6 +41,12 @@ public sealed class Restaurant
     /// <summary>Kitchen/staff WhatsApp number (with country code, e.g. 923001234567). Confirmed orders, bookings and handovers are sent here.</summary>
     public string? StaffWhatsAppNumber { get; set; }
 
+    /// <summary>
+    /// Example chats the owner pasted or imported (old WhatsApp chats, screenshots read by the AI) so the bot learns
+    /// the restaurant's way of talking. Phone numbers are masked before saving. Goes into the system prompt.
+    /// </summary>
+    public string? TrainingExamples { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public List<MenuItem> MenuItems { get; set; } = [];

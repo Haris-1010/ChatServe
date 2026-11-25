@@ -496,6 +496,9 @@ namespace ChatServe.Api.Data.Migrations
                     b.Property<string>("Timings")
                         .HasColumnType("text");
 
+                    b.Property<string>("TrainingExamples")
+                        .HasColumnType("text");
+
                     b.Property<string>("WhatsAppPhoneNumberId")
                         .IsRequired()
                         .HasMaxLength(50)

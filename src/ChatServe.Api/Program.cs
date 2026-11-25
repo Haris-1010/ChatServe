@@ -47,6 +47,7 @@ builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(DatabaseUrl.ToConne
 builder.Services.AddOptions<AiOptions>().Bind(builder.Configuration.GetSection(AiOptions.SectionName));
 builder.Services.AddSingleton<AnthropicClientProvider>(); // new client when the key changes from the dashboard
 builder.Services.AddSingleton<IChatCompletionClient, ClaudeChatCompletionClient>();
+builder.Services.AddSingleton<IChatScreenshotReader, ClaudeChatScreenshotReader>();
 builder.Services.AddSingleton(TimeProvider.System);
 
 // ---- Orders (Phase 3) ----

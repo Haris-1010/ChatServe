@@ -270,7 +270,16 @@ public class OrderFlowTests
     [InlineData("abhi confirm na karo", true, false)]
     [InlineData("confirm nahi karna", true, false)]
     [InlineData("pehle batayen confirm karne ke baad kitni der lagegi aur rider kab aayega", true, false)]
-    [InlineData("haan", true, false)]
+    [InlineData("haan", true, true)]
+    [InlineData("han done kr do", true, true)]
+    [InlineData("ji theek hai bhej dein", true, true)]
+    [InlineData("ok", true, true)]
+    [InlineData("haan", false, false)]
+    [InlineData("han done kr do", false, false)]
+    [InlineData("haan aur ek coke bhi", true, false)]
+    [InlineData("ok 2 biryani kar do", true, false)]
+    [InlineData("ok delivery kab tak?", true, false)]
+    [InlineData("nahi abhi nahi", true, false)]
     public void Confirmation_words(string text, bool numeric, bool expected) =>
         Assert.Equal(expected, OrderFormatter.IsConfirmation(text, numeric));
 

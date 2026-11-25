@@ -53,6 +53,7 @@ import { errorText, Toasts } from '../core/toast';
           <div class="nav-label">Bot setup</div>
           <a routerLink="/menu" routerLinkActive="active"><span>🍛</span> Menu &amp; FAQs</a>
           <a routerLink="/restaurant" routerLinkActive="active"><span>🏪</span> Restaurant info</a>
+          <a routerLink="/training" routerLinkActive="active"><span>🎓</span> Bot training</a>
           <a routerLink="/simulator" routerLinkActive="active"><span>🧪</span> Test the bot</a>
           @if (!auth.isAdmin()) {
             <div class="nav-label">Account</div>

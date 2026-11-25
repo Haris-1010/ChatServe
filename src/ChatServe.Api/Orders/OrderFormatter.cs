@@ -107,18 +107,47 @@ public static partial class OrderFormatter
 
     // ---- Recognising customer replies (without AI) ----
 
-    /// <summary>"confirm", "confirm kar do", "ok confirm", "1", etc. False if it contains a negative word.</summary>
-    public static bool IsConfirmation(string text, bool allowNumericShortcut)
+    /// <summary>
+    /// "confirm", "confirm kar do", "ok confirm" always count. Right after the summary (<paramref name="summaryJustShown"/>)
+    /// a plain yes also counts: "1", "haan", "ji done kr do", "ok bhej do". False if it has a negative word,
+    /// asks a question or asks for a change ("haan aur ek coke"): then the AI handles it.
+    /// </summary>
+    public static bool IsConfirmation(string text, bool summaryJustShown)
     {
         var words = Words(text);
         if (words.Length == 0) return false;
-        if (allowNumericShortcut && words is ["1"]) return true;
-        if (words.Length > 5 || words.Any(NegativeWords.Contains)) return false;
+        if (summaryJustShown && words is ["1"]) return true;
+        if (words.Any(NegativeWords.Contains)) return false;
         // "na karo" means "don't"; but "confirm kar do na" (with "na" at the end) is a yes
         for (var i = 0; i < words.Length - 1; i++)
             if (words[i] == "na" && words[i + 1].StartsWith("kar", StringComparison.Ordinal)) return false;
-        return words.Any(w => w is "confirm" or "confirmed" or "confrm" or "conform" or "confirmd");
+
+        if (words.Length <= 5 && words.Any(ConfirmWords.Contains))
+            return true;
+
+        return summaryJustShown
+               && words.Length <= 6
+               && !text.Contains('?')
+               && words.Any(YesWords.Contains)
+               && !words.Any(w => ChangeWords.Contains(w) || w.Any(char.IsDigit));
     }
+
+    private static readonly HashSet<string> ConfirmWords = ["confirm", "confirmed", "confrm", "conform", "confirmd"];
+
+    private static readonly HashSet<string> YesWords =
+    [
+        "han", "haan", "haa", "ha", "hn", "hanji", "g", "ji", "jee", "jii", "yes", "yeah", "yep", "yup",
+        "ok", "okay", "okk", "okey", "theek", "thik", "theak", "sahi", "done", "perfect", "bilkul", "zaroor",
+        "bhej", "bhejo", "bhejden", "bhejdo", "place", "final",
+    ];
+
+    /// <summary>A yes with one of these is probably a change ("haan aur ek coke"), not a confirm.</summary>
+    private static readonly HashSet<string> ChangeWords =
+    [
+        "add", "change", "aur", "or", "lekin", "magar", "but", "plus", "remove", "hata", "hatao", "badal", "badlo",
+        "instead", "extra", "sath", "saath", "mazeed", "bhi", "sirf", "only", "kam", "zyada", "ziada", "replace",
+        "without", "baghair", "minus", "address", "time", "kab", "kitna", "kitni", "kya",
+    ];
 
     /// <summary>"cancel", "cancel kar do", etc.</summary>
     public static bool IsCancellation(string text)

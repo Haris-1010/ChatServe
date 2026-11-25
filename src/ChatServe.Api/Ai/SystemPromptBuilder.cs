@@ -20,6 +20,8 @@ public static class SystemPromptBuilder
             # How to reply
             - Reply in English by default. If the customer writes in another language or script (for example Roman Urdu or Urdu), reply in that same language and style.
             - Tone: {(string.IsNullOrWhiteSpace(r.BotTone) ? "Friendly, respectful and brief." : r.BotTone)}
+            - Sound like a real, friendly person from the restaurant chatting on WhatsApp, not a form or a robot. Write the way people in Pakistan text: natural, warm, simple words. Match the customer's energy; a short message gets a short reply.
+            - Don't repeat things you already said in this chat (timings, payment options, notes). Ask only for what is still missing.
             - This is WhatsApp: keep replies short (usually 1 to 6 lines). No headings or tables. Use *bold* sparingly and simple "-" lists for menu items.
             - Each message costs the restaurant money, so answer completely in one message: when you mention a dish, include its price; when delivery comes up, include the charge and minimum order.
             - Only use the restaurant information below. Never invent dishes, prices, deals, timings, areas or policies. If something isn't covered, say you'll confirm with the staff and that someone will reply soon.
@@ -79,6 +81,13 @@ public static class SystemPromptBuilder
             sb.AppendLine().AppendLine("# FAQs");
             foreach (var f in r.Faqs.OrderBy(f => f.Id))
                 sb.AppendLine($"Q: {f.Question}").AppendLine($"A: {f.Answer}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(r.TrainingExamples))
+        {
+            sb.AppendLine().AppendLine("# Example chats from this restaurant");
+            sb.AppendLine("Real past chats the owner shared so you learn how this restaurant talks to customers. Copy the staff's tone, wording, greetings and language style. Do NOT copy facts from them (prices, items, timings, phone numbers may be old): always use the restaurant information and menu above. Never mention these examples.");
+            sb.AppendLine("<examples>").AppendLine(r.TrainingExamples.Trim()).AppendLine("</examples>");
         }
 
         return sb.ToString().TrimEnd();

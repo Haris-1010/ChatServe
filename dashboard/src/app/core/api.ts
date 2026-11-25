@@ -114,6 +114,9 @@ export const ORDER_TYPE_LABEL: Record<OrderType, string> = { Delivery: 'Delivery
 
 // ---------- API ----------
 
+export interface Training { text: string | null; maxLength: number; }
+export interface TrainingFile { fileName: string; text?: string; imageBase64?: string; mediaType?: string; }
+
 @Injectable({ providedIn: 'root' })
 export class Api {
   private http = inject(HttpClient);
@@ -153,6 +156,9 @@ export class Api {
   }
   restaurant(rid: number) { return this.get<RestaurantProfile>(`/api/restaurants/${rid}`); }
   saveRestaurant(rid: number, p: RestaurantProfile) { return this.put<RestaurantProfile>(`/api/restaurants/${rid}`, p); }
+  training(rid: number) { return this.get<Training>(`/api/restaurants/${rid}/training`); }
+  saveTraining(rid: number, text: string) { return this.put<Training>(`/api/restaurants/${rid}/training`, { text }); }
+  importTraining(rid: number, file: TrainingFile) { return this.post<{ text: string }>(`/api/restaurants/${rid}/training/import`, file); }
 
   /** Menu, deals, FAQs, zones: the same CRUD endpoints for each. */
   list<T>(rid: number, kind: 'menu' | 'deals' | 'faqs' | 'zones') { return this.get<T[]>(`/api/restaurants/${rid}/${kind}`); }
