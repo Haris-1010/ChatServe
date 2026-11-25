@@ -65,6 +65,15 @@ public static class SettingsCatalog
         new("Anthropic:MaxToolRounds", "AI (Claude)", "Max tool rounds", SettingKind.Number,
             "How many times the AI can use tools for one message. Default 5."),
 
+        new("Site:BusinessName", "Website", "Business name", SettingKind.Text,
+            "Shown on the public website /site. Must match your NTN certificate and Meta business portfolio exactly. Default ChatServe."),
+        new("Site:Address", "Website", "Business address", SettingKind.Text,
+            "Exactly as on the NTN certificate."),
+        new("Site:ContactEmail", "Website", "Contact email", SettingKind.Text,
+            "Shown on the website and in the privacy policy (for data deletion requests)."),
+        new("Site:ContactPhone", "Website", "Contact phone / WhatsApp", SettingKind.Text,
+            "For example +92 300 1234567."),
+
         new("Voice:OpenAiApiKey", "Voice notes", "OpenAI API key (Whisper)", SettingKind.Secret,
             "platform.openai.com > API keys. With a key, customers' voice notes are turned into text and answered. Empty = they get a \"please type\" reply."),
         new("Voice:Model", "Voice notes", "Speech-to-text model", SettingKind.Text,

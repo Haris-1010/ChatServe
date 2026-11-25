@@ -10,6 +10,7 @@ import { errorText } from '../core/toast';
   imports: [FormsModule],
   template: `
     <div class="login-wrap">
+      <div>
       <form class="card login" (ngSubmit)="submit()">
         <div class="brand big"><span class="logo">💬</span> ChatServe</div>
         <p class="muted">Dashboard for your restaurant's WhatsApp AI agent</p>
@@ -25,6 +26,8 @@ import { errorText } from '../core/toast';
         <button class="btn primary block" [disabled]="busy() || !password">{{ busy() ? 'Logging in…' : 'Login' }}</button>
         <p class="muted small">Use the username and password ChatServe gave you.</p>
       </form>
+      <p class="muted small site-links" style="text-align:center;margin-top:12px"><a href="/site">About ChatServe</a> · <a href="/site/privacy">Privacy Policy</a> · <a href="/site/terms">Terms</a></p>
+      </div>
     </div>
   `,
 })

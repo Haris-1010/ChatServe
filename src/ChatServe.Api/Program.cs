@@ -45,6 +45,7 @@ builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(DatabaseUrl.ToConne
 
 // ---- AI (Claude) ----
 builder.Services.AddOptions<AiOptions>().Bind(builder.Configuration.GetSection(AiOptions.SectionName));
+builder.Services.AddOptions<SiteOptions>().Bind(builder.Configuration.GetSection(SiteOptions.SectionName));
 builder.Services.AddOptions<UsageOptions>().Bind(builder.Configuration.GetSection(UsageOptions.SectionName));
 builder.Services.AddSingleton<AnthropicClientProvider>(); // new client when the key changes from the dashboard
 builder.Services.AddSingleton<IChatCompletionClient, ClaudeChatCompletionClient>();
@@ -101,6 +102,7 @@ if (!DashboardSetup.HasBuiltDashboard(app.Environment))
 app.MapGet("/health", () => Results.Ok("healthy"));
 app.MapControllers();
 app.MapDashboard();
+app.MapSitePages(); // public website: /site, /site/privacy, /site/terms
 
 app.Run();
 
