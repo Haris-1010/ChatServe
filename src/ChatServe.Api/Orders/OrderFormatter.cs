@@ -61,6 +61,10 @@ public static partial class OrderFormatter
         if (o.Type == OrderType.Delivery) sb.AppendLine($"Address: {o.DeliveryAddress} ({o.DeliveryArea})");
         if (!string.IsNullOrWhiteSpace(o.PaymentMethod)) sb.AppendLine($"Payment: {o.PaymentMethod}");
         if (!string.IsNullOrWhiteSpace(o.Notes)) sb.AppendLine($"Note: {o.Notes}");
+        sb.AppendLine();
+        sb.Append(o.Type == OrderType.Delivery
+            ? $"Reply: *prep {o.Id}* / *out {o.Id}* / *done {o.Id}*"
+            : $"Reply: *prep {o.Id}* / *done {o.Id}*");
         return sb.ToString().TrimEnd();
     }
 

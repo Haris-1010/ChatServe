@@ -34,7 +34,7 @@ public sealed class FakeStaffNotifier : IStaffNotifier
 {
     public ConcurrentQueue<string> Alerts { get; } = new();
 
-    public Task NotifyAsync(Restaurant restaurant, string text, CancellationToken ct)
+    public Task NotifyAsync(Restaurant restaurant, string text, CancellationToken ct, string? exceptPhone = null)
     {
         Alerts.Enqueue(text);
         return Task.CompletedTask;

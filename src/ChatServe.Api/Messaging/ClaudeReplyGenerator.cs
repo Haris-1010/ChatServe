@@ -18,7 +18,8 @@ public sealed class ClaudeReplyGenerator(
     IStaffNotifier staff,
     IOptionsMonitor<AiOptions> aiOptions,
     TimeProvider clock,
-    ILogger<ClaudeReplyGenerator> logger) : IReplyGenerator
+    ILogger<ClaudeReplyGenerator> logger,
+    StaffCommandHandler? staffCommands = null) : IReplyGenerator
 {
     public const string NonTextReply =
         "Sorry, I can only read text messages for now. Please type your question. 🙏";
@@ -46,6 +47,10 @@ public sealed class ClaudeReplyGenerator(
         // Meta retries after an app restart: also check the DB for duplicates.
         if (await db.ChatMessages.AnyAsync(m => m.WhatsAppMessageId == message.MessageId, ct))
             return null;
+
+        // A staff number sending "out 12", "orders", etc.: run the command, no AI and no customer record.
+        if (staffCommands is not null && await staffCommands.TryHandleAsync(restaurant, message, ct) is { } staffReply)
+            return staffReply;
 
         var now = clock.GetUtcNow();
         var customer = await UpsertCustomerAsync(restaurant.Id, message, now, ct);

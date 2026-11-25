@@ -1,3 +1,4 @@
+using ChatServe.Api.Orders;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -33,7 +34,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.WhatsAppPhoneNumberId).HasMaxLength(50);
             e.Property(x => x.Currency).HasMaxLength(10);
             e.Property(x => x.MinimumOrder).HasPrecision(10, 2);
-            e.Property(x => x.StaffWhatsAppNumber).HasMaxLength(20);
+            e.Property(x => x.StaffWhatsAppNumber).HasMaxLength(StaffNumbers.MaxStoredLength);
         });
 
         b.Entity<DeliveryZone>(e =>

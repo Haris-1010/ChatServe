@@ -53,6 +53,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddOptions<OrderOptions>().Bind(builder.Configuration.GetSection(OrderOptions.SectionName));
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<IStaffNotifier, WhatsAppStaffNotifier>();
+builder.Services.AddScoped<StaffCommandHandler>();
 builder.Services.AddScoped<SimulationContext>();
 
 // ---- Message pipeline ----

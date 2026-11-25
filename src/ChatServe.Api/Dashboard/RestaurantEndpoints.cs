@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using ChatServe.Api.Data;
+using ChatServe.Api.Orders;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChatServe.Api.Dashboard;
@@ -68,9 +69,9 @@ public static class RestaurantEndpoints
             var phoneId = input.WhatsAppPhoneNumberId.Trim();
             if (await db.Restaurants.AnyAsync(x => x.Id != rid && x.WhatsAppPhoneNumberId == phoneId, ct))
                 return Bad("This Phone number ID belongs to another restaurant.");
-            var staff = Digits(input.StaffWhatsAppNumber);
-            if (staff is not null && staff.Length is < 10 or > 15)
-                return Bad("Enter the staff number with the country code, e.g. 923001234567.");
+            var (staff, staffError) = StaffNumbers.Normalize(input.StaffWhatsAppNumber);
+            if (staffError is not null)
+                return Bad(staffError);
 
             r.Name = input.Name.Trim();
             r.WhatsAppPhoneNumberId = phoneId;
@@ -244,12 +245,6 @@ public static class RestaurantEndpoints
     }
 
     private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
-
-    private static string? Digits(string? s)
-    {
-        var d = new string((s ?? "").Where(char.IsDigit).ToArray());
-        return d.Length == 0 ? null : d;
-    }
 
     private static RestaurantProfile ToProfile(Restaurant r) => new(
         r.Id, r.Name, r.WhatsAppPhoneNumberId, r.IsBotEnabled, r.BotTone, r.Address, r.Timings, r.DeliveryAreas,

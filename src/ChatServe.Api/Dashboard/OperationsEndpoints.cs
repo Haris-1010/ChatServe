@@ -283,7 +283,7 @@ public static class OperationsEndpoints
     };
 
     /// <summary>A WhatsApp message from staff + chat log. Simulator customers get no WhatsApp, only the log. Returns the error message if any.</summary>
-    private static async Task<string?> SendStaffMessageAsync(AppDbContext db, IWhatsAppClient whatsApp, Restaurant restaurant,
+    internal static async Task<string?> SendStaffMessageAsync(AppDbContext db, IWhatsAppClient whatsApp, Restaurant restaurant,
         int customerId, string phone, string text, DateTimeOffset now, CancellationToken ct, bool saveOnFailure = true)
     {
         string? error = null;
