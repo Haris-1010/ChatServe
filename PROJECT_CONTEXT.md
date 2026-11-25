@@ -1,6 +1,6 @@
 # WhatsApp AI Agent: Project Context (ChatServe)
 
-> **For Claude in a new session:** This file is the full context of the project by Talha (full stack .NET developer, Lahore). Continue the work from here. Talk with Talha in **Roman Urdu**. Don't re-explain earlier discussions; start directly from the **"Current status / Next step"** section.
+> **For Claude in a new session:** Also read `docs/SESSION_HANDOVER.md` (latest session). This file is the full context of the project by Talha (full stack .NET developer, Lahore). Continue the work from here. Talk with Talha in **Roman Urdu**. Don't re-explain earlier discussions; start directly from the **"Current status / Next step"** section.
 
 ---
 
