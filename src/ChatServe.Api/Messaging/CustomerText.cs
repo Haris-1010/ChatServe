@@ -68,11 +68,14 @@ public static partial class CustomerText
         ? "Theek hai, order cancel kar diya hai. Kuch aur chahiye ho to bata dein 🙂"
         : OrderFormatter.DraftCancelledReply;
 
+    /// <summary>The reply to a voice note that can't be turned into text (same in Roman Urdu and English).</summary>
+    public const string VoiceReply = "Please text me 🙏";
+
     public static string CannotRead(bool ru, bool voice) => (ru, voice) switch
     {
-        (true, true) => "Maaf kijiye, abhi hum voice message nahi sun sakte. Please apna sawal likh kar bhej dein 🙏",
+        (true, true) => VoiceReply,
         (true, false) => "Maaf kijiye, abhi hum sirf likhe hue messages parh sakte hain. Please apna sawal likh kar bhej dein 🙏",
-        (false, true) => "Sorry, we can't listen to voice messages right now. Please type your question. 🙏",
+        (false, true) => VoiceReply,
         _ => ClaudeReplyGenerator.NonTextReply,
     };
 
