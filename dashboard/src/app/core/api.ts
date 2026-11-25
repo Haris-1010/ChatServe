@@ -123,7 +123,13 @@ export interface UsageClient {
   percent: number | null; warning: boolean; overLimit: boolean; usage: UsageLine;
   restaurants: { id: number; name: string; usage: UsageLine }[];
 }
-export interface UsageReport { month: string; pkrPerUsd: number; warnAtPercent: number; total: UsageLine; clients: UsageClient[]; }
+export interface UsageCredit {
+  balanceUsd: number; setAt: string; spentUsd: number; spentTokens: number; remainingUsd: number; remainingPkr: number;
+  percent: number; tokensLeft: number | null; repliesLeft: number | null;
+}
+export interface UsageReport {
+  month: string; pkrPerUsd: number; warnAtPercent: number; total: UsageLine; credit: UsageCredit | null; clients: UsageClient[];
+}
 
 export interface Training { text: string | null; maxLength: number; }
 export interface TrainingFile { fileName: string; text?: string; imageBase64?: string; mediaType?: string; }
@@ -168,6 +174,7 @@ export class Api {
   restaurant(rid: number) { return this.get<RestaurantProfile>(`/api/restaurants/${rid}`); }
   saveRestaurant(rid: number, p: RestaurantProfile) { return this.put<RestaurantProfile>(`/api/restaurants/${rid}`, p); }
   usage(month?: string) { return this.get<UsageReport>('/api/usage', month ? { month } : undefined); }
+  setCredit(balanceUsd: number | null) { return this.put<void>('/api/usage/credit', { balanceUsd }); }
   setReplyLimit(clientId: number, monthlyReplyLimit: number | null) { return this.put<{ id: number; monthlyReplyLimit: number | null }>(`/api/clients/${clientId}/limit`, { monthlyReplyLimit }); }
   training(rid: number) { return this.get<Training>(`/api/restaurants/${rid}/training`); }
   saveTraining(rid: number, text: string) { return this.put<Training>(`/api/restaurants/${rid}/training`, { text }); }

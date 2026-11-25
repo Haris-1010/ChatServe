@@ -107,4 +107,33 @@ public class UsageTests
         Assert.Equal(1500, total.GetProperty("inputTokens").GetInt64());
         Assert.Equal(0, total.GetProperty("replies").GetInt32()); // not a customer reply
     }
+
+    [Fact]
+    public async Task Credit_left_is_the_entered_balance_minus_use_since_then()
+    {
+        var (factory, admin) = await DashboardApiTests.LoggedInAsync();
+        await using var _ = factory;
+        var demo = await DashboardApiTests.RestaurantIdAsync(admin);
+
+        // Use before the balance was entered doesn't count against it
+        await AddReplyAsync(factory, demo, 1_000_000, 0);
+        Assert.Equal(JsonValueKind.Null, (await admin.GetFromJsonAsync<JsonElement>("/api/usage")).GetProperty("credit").ValueKind);
+
+        (await admin.PutAsJsonAsync("/api/usage/credit", new { balanceUsd = 5m })).EnsureSuccessStatusCode();
+        // 2 replies: 2M input + 400K output = $0.40
+        await AddReplyAsync(factory, demo, 1_000_000, 200_000);
+        await AddReplyAsync(factory, demo, 1_000_000, 200_000);
+
+        var c = (await admin.GetFromJsonAsync<JsonElement>("/api/usage")).GetProperty("credit");
+        Assert.Equal(5m, c.GetProperty("balanceUsd").GetDecimal());
+        Assert.Equal(0.40m, c.GetProperty("spentUsd").GetDecimal());
+        Assert.Equal(4.60m, c.GetProperty("remainingUsd").GetDecimal());
+        Assert.Equal(92, c.GetProperty("percent").GetInt32());
+        Assert.Equal(23, c.GetProperty("repliesLeft").GetInt64()); // $0.20 a reply
+        Assert.Equal(27_600_000, c.GetProperty("tokensLeft").GetInt64()); // 2.4M tokens for $0.40
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync("/api/usage/credit", new { balanceUsd = -1m })).StatusCode);
+        (await admin.PutAsJsonAsync("/api/usage/credit", new { balanceUsd = (decimal?)null })).EnsureSuccessStatusCode();
+        Assert.Equal(JsonValueKind.Null, (await admin.GetFromJsonAsync<JsonElement>("/api/usage")).GetProperty("credit").ValueKind);
+    }
 }

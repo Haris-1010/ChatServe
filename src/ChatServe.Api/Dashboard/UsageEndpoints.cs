@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Claims;
 using ChatServe.Api.Ai;
+using ChatServe.Api.Configuration;
 using ChatServe.Api.Data;
 using ChatServe.Api.Orders;
 using Microsoft.EntityFrameworkCore;
@@ -89,14 +90,30 @@ public static class UsageEndpoints
                 };
             }).ToList();
 
+            var total = Line(replies.Concat(extra));
             return Results.Ok(new
             {
                 Month = first.ToString("yyyy-MM", CultureInfo.InvariantCulture),
                 p.PkrPerUsd,
                 p.WarnAtPercent,
-                Total = Line(replies.Concat(extra)),
+                Total = total,
+                Credit = own == null ? await CreditAsync(db, p, total, ct) : null,
                 Clients = clients,
             });
+        });
+
+        // The admin types in the balance from console.anthropic.com → Billing (Anthropic has no API for it).
+        // From then on, AI use is subtracted from it to show what's left.
+        admin.MapPut("/usage/credit", async (CreditRequest req, SettingsStore store, TimeProvider clock, CancellationToken ct) =>
+        {
+            if (req.BalanceUsd is < 0)
+                return RestaurantEndpoints.Bad("The balance can't be negative.");
+            await store.SaveInternalAsync(new Dictionary<string, string?>
+            {
+                ["Usage:CreditBalanceUsd"] = req.BalanceUsd?.ToString(CultureInfo.InvariantCulture),
+                ["Usage:CreditBalanceSetAt"] = req.BalanceUsd is null ? null : clock.GetUtcNow().ToString("o", CultureInfo.InvariantCulture),
+            }, ct);
+            return Results.NoContent();
         });
 
         admin.MapPut("/clients/{id:int}/limit", async (int id, LimitRequest req, AppDbContext db, CancellationToken ct) =>
@@ -111,6 +128,58 @@ public static class UsageEndpoints
             return Results.Ok(new { org.Id, org.MonthlyReplyLimit });
         });
     }
+
+    /// <summary>
+    /// What's left of the Anthropic credit: the entered balance minus the cost of all AI use since it was entered
+    /// (every client). Tokens and replies left are estimates at the average cost seen since then
+    /// (or this month's average when there's no use yet).
+    /// </summary>
+    private static async Task<object?> CreditAsync(AppDbContext db, UsageOptions p, UsageLine month, CancellationToken ct)
+    {
+        if (p.CreditBalanceUsd is not { } balance || p.CreditBalanceSetAt is not { } since)
+            return null;
+
+        var bot = await db.ChatMessages.AsNoTracking()
+            .Where(m => m.Role == ChatRole.Bot && m.InputTokens != null && m.CreatedAt >= since)
+            .GroupBy(m => 1)
+            .Select(g => new Tokens(0, g.Count(),
+                g.Sum(m => (long?)m.InputTokens) ?? 0, g.Sum(m => (long?)m.OutputTokens) ?? 0,
+                g.Sum(m => (long?)m.CacheReadTokens) ?? 0, g.Sum(m => (long?)m.CacheWriteTokens) ?? 0))
+            .FirstOrDefaultAsync(ct);
+        var other = await db.AiUsageLogs.AsNoTracking()
+            .Where(l => l.CreatedAt >= since)
+            .GroupBy(l => 1)
+            .Select(g => new Tokens(0, 0,
+                g.Sum(l => (long)l.InputTokens), g.Sum(l => (long)l.OutputTokens),
+                g.Sum(l => (long)l.CacheReadTokens), g.Sum(l => (long)l.CacheWriteTokens)))
+            .FirstOrDefaultAsync(ct);
+        var t = (bot ?? new Tokens(0, 0, 0, 0, 0, 0)) + (other ?? new Tokens(0, 0, 0, 0, 0, 0));
+        var spent = p.CostUsd(t.Input, t.Output, t.CacheRead, t.CacheWrite);
+        var remaining = Math.Max(0, balance - spent);
+
+        // Average cost per token and per reply: since the balance was entered, else this month
+        var tokens = t.Input + t.Output + t.CacheRead + t.CacheWrite;
+        var (cost, tokenCount, replyCount) = tokens > 0
+            ? (spent, tokens, t.Replies)
+            : (month.CostUsd, month.InputTokens + month.OutputTokens + month.CacheReadTokens + month.CacheWriteTokens, month.Replies);
+        long? tokensLeft = cost > 0 && tokenCount > 0 ? (long)Math.Floor(remaining * tokenCount / cost) : null;
+        long? repliesLeft = cost > 0 && replyCount > 0 ? (long)Math.Floor(remaining * replyCount / cost) : null;
+
+        return new
+        {
+            BalanceUsd = balance,
+            SetAt = since,
+            SpentUsd = Math.Round(spent, 4),
+            SpentTokens = tokens,
+            RemainingUsd = Math.Round(remaining, 4),
+            RemainingPkr = Math.Round(remaining * p.PkrPerUsd, 0),
+            Percent = balance > 0 ? (int)Math.Round(remaining * 100m / balance) : 0,
+            TokensLeft = tokensLeft,
+            RepliesLeft = repliesLeft,
+        };
+    }
+
+    public sealed record CreditRequest(decimal? BalanceUsd);
 
     private sealed record Tokens(int RestaurantId, int Replies, long Input, long Output, long CacheRead, long CacheWrite)
     {

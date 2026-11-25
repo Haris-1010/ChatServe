@@ -1,5 +1,5 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Api, UsageClient, UsageLine, UsageReport } from '../core/api';
 import { Auth } from '../core/auth';
@@ -7,7 +7,7 @@ import { errorText, Toasts } from '../core/toast';
 
 @Component({
   selector: 'app-usage',
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, DatePipe],
   template: `
     <div class="page-head">
       <h1>AI usage</h1>
@@ -24,7 +24,37 @@ import { errorText, Toasts } from '../core/toast';
             <div class="stat-value small-value">{{ tokens(r.total) | number }}</div>
             <div class="stat-sub">{{ r.total.inputTokens | number }} in · {{ r.total.outputTokens | number }} out</div></div>
         </div>
-        <p class="muted small">Your Anthropic credit balance is at <b>console.anthropic.com → Billing</b>. Prices and the dollar rate are in Settings → AI cost.</p>
+
+        <div class="card credit" [class.warn]="r.credit && r.credit.percent <= 20" [class.over]="r.credit && r.credit.remainingUsd <= 0">
+          <h2>Anthropic credit left</h2>
+          @if (r.credit; as cr) {
+            <div class="credit-row">
+              <div>
+                <div class="big">$ {{ cr.remainingUsd | number:'1.2-2' }} <span class="of">/ $ {{ cr.balanceUsd | number:'1.2-2' }}</span></div>
+                <div class="small muted">Rs {{ cr.remainingPkr | number:'1.0-0' }} · {{ cr.percent }}% left</div>
+              </div>
+              <div>
+                <div class="big">{{ cr.tokensLeft != null ? (cr.tokensLeft | number) : '—' }} <span class="of">tokens left</span></div>
+                <div class="small muted">
+                  @if (cr.repliesLeft != null) { about {{ cr.repliesLeft | number }} more AI replies } @else { no AI use yet to estimate from }
+                </div>
+              </div>
+            </div>
+            <div class="bar"><div [style.width.%]="min(cr.percent, 100)"></div></div>
+            <div class="small muted">
+              Balance entered {{ cr.setAt | date:'d MMM y, h:mm a' }}. Used since then: $ {{ cr.spentUsd | number:'1.2-4' }}
+              ({{ cr.spentTokens | number }} tokens). Tokens and replies left are estimates at the average cost so far.
+            </div>
+          } @else {
+            <div class="small muted">Enter your balance to see how much is left. Anthropic doesn't share the balance through the API.</div>
+          }
+          <form class="budget" (ngSubmit)="saveCredit()">
+            <label class="field"><span>Current balance from console.anthropic.com → Billing ($)</span>
+              <input type="number" min="0" step="0.01" name="credit" [(ngModel)]="creditInput" placeholder="e.g. 5.00" /></label>
+            <button class="btn" [disabled]="busy()">Save balance</button>
+          </form>
+        </div>
+        <p class="muted small">After a top-up, enter the new balance again. Prices and the dollar rate are in Settings → AI cost.</p>
       }
 
       @for (c of r.clients; track c.id) {
@@ -88,6 +118,13 @@ import { errorText, Toasts } from '../core/toast';
     .page-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
     .page-head input { width: auto; }
     .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 8px; }
+    .credit { margin: 6px 0 8px; display: flex; flex-direction: column; gap: 10px; }
+    .credit h2 { margin: 0; font-size: 18px; }
+    .credit.warn { border-color: rgba(245, 166, 35, .6); }
+    .credit.warn .bar div { background: #f5a623; }
+    .credit.over { border-color: rgba(229, 72, 77, .7); }
+    .credit.over .bar div { background: #e5484d; }
+    .credit-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
     .client { margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; }
     .client.warn { border-color: rgba(245, 166, 35, .6); }
     .client.over { border-color: rgba(229, 72, 77, .7); }
@@ -117,6 +154,7 @@ export class UsagePage implements OnInit {
   month = signal('');
   busy = signal(false);
   budgets: Record<number, number | null> = {};
+  creditInput: number | null = null;
 
   ngOnInit() { this.load(); }
 
@@ -130,6 +168,21 @@ export class UsagePage implements OnInit {
   }
 
   pick(month: string) { if (month) this.load(month); }
+
+  async saveCredit() {
+    this.busy.set(true);
+    try {
+      const v = this.creditInput;
+      await this.api.setCredit(v == null || (v as unknown) === '' ? null : +v);
+      this.toasts.ok('Balance saved.');
+      this.creditInput = null;
+      await this.load(this.month());
+    } catch (e) {
+      this.toasts.error(errorText(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
 
   async saveBudget(c: UsageClient) {
     this.busy.set(true);

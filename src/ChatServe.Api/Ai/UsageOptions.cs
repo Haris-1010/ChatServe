@@ -16,6 +16,12 @@ public sealed class UsageOptions
     public int WarnAtPercent { get; set; } = 80;
     public string AdminWhatsAppNumber { get; set; } = string.Empty;
 
+    /// <summary>The Anthropic credit balance the admin last typed in (from console.anthropic.com → Billing), in $.</summary>
+    public decimal? CreditBalanceUsd { get; set; }
+
+    /// <summary>When that balance was entered: AI use after this time is subtracted from it.</summary>
+    public DateTimeOffset? CreditBalanceSetAt { get; set; }
+
     public decimal CostUsd(long input, long output, long cacheRead, long cacheWrite) =>
         (input * InputUsdPerMillion + output * OutputUsdPerMillion +
          cacheRead * CacheReadUsdPerMillion + cacheWrite * CacheWriteUsdPerMillion) / 1_000_000m;

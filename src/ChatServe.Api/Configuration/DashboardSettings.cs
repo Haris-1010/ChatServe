@@ -163,6 +163,36 @@ public sealed class SettingsStore(AppDbContext db, DashboardSettingsProvider pro
         await LoadAsync(ct);
     }
 
+    /// <summary>
+    /// Saves values that aren't on the Settings page (e.g. the Anthropic credit balance entered on the AI usage page).
+    /// Keys in the catalog go through <see cref="SaveAsync"/> instead.
+    /// </summary>
+    public async Task SaveInternalAsync(IReadOnlyDictionary<string, string?> values, CancellationToken ct = default)
+    {
+        var now = clock.GetUtcNow();
+        foreach (var (key, value) in values)
+        {
+            if (SettingsCatalog.Find(key) is not null)
+                throw new ArgumentException($"'{key}' is a Settings page value.");
+            var existing = await db.AppSettings.FindAsync([key], ct);
+            if (value is null)
+            {
+                if (existing is not null)
+                    db.AppSettings.Remove(existing);
+            }
+            else if (existing is null)
+                db.AppSettings.Add(new AppSetting { Key = key, Value = value, UpdatedAt = now });
+            else
+            {
+                existing.Value = value;
+                existing.UpdatedAt = now;
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+        await LoadAsync(ct);
+    }
+
     private static string Normalize(SettingDefinition def, string value)
     {
         value = def.Kind == SettingKind.TextArea ? value : value.Trim();
