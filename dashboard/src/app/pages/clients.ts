@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
-import { Api, Client, ClientBranch, ClientLogin, ClientsResponse, CurrentRestaurant, money, randomPassword, when } from '../core/api';
+import { Router, RouterLink } from '@angular/router';
+import { Api, Client, ClientBranch, ClientLogin, ClientsResponse, CurrentRestaurant, money, randomPassword, UsageReport, when } from '../core/api';
 import { errorText, Toasts } from '../core/toast';
 
 /**
@@ -10,7 +10,7 @@ import { errorText, Toasts } from '../core/toast';
  */
 @Component({
   selector: 'app-clients',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   template: `
     <div class="page-head">
       <h1>All clients</h1>
@@ -28,6 +28,25 @@ import { errorText, Toasts } from '../core/toast';
         <div class="stat"><div class="stat-label">Orders today</div><div class="stat-value">{{ d.totals.ordersToday }}</div></div>
         <div class="stat"><div class="stat-label">Sales today</div><div class="stat-value">{{ money(d.totals.salesToday) }}</div></div>
         <div class="stat"><div class="stat-label">Chats today</div><div class="stat-value">{{ d.totals.chatsToday }}</div></div>
+        @if (usage(); as u) {
+          <!-- AI cost of every client together, and what the Anthropic credit still covers -->
+          <a class="stat link" routerLink="/usage">
+            <div class="stat-label">AI cost this month</div>
+            <div class="stat-value">{{ money(u.total.costPkr) }}</div>
+            <div class="stat-sub">{{ u.total.replies.toLocaleString('en-PK') }} replies · \${{ u.total.costUsd.toFixed(2) }}
+              @if (u.credit; as c) { · since top-up {{ money(c.spentUsd * u.pkrPerUsd) }} }</div>
+          </a>
+          <a class="stat link" routerLink="/usage" [class.warn-stat]="u.credit && u.credit.percent <= 20">
+            <div class="stat-label">Replies left (AI credit)</div>
+            @if (u.credit; as c) {
+              <div class="stat-value">{{ c.repliesLeft === null ? '—' : '~' + c.repliesLeft.toLocaleString('en-PK') }}</div>
+              <div class="stat-sub">\${{ c.remainingUsd.toFixed(2) }} ({{ money(c.remainingPkr) }}) of \${{ c.balanceUsd.toFixed(2) }} left</div>
+            } @else {
+              <div class="stat-value">—</div>
+              <div class="stat-sub">Enter your Anthropic balance on the AI usage page</div>
+            }
+          </a>
+        }
       </div>
     }
 
@@ -157,6 +176,7 @@ export class ClientsPage {
   private restaurants = inject(CurrentRestaurant);
 
   data = signal<ClientsResponse | null>(null);
+  usage = signal<UsageReport | null>(null);
   busy = signal(false);
   showNew = signal(false);
   addBranchFor = signal<number | null>(null);
@@ -186,6 +206,8 @@ export class ClientsPage {
 
   async load() {
     try { this.data.set(await this.api.clients()); } catch (e) { this.toasts.error(errorText(e)); }
+    // The AI cost cards are extra: if they fail, the page still works.
+    try { this.usage.set(await this.api.usage()); } catch { this.usage.set(null); }
   }
 
   private async run(action: () => Promise<unknown>, ok: string) {
