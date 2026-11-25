@@ -10,7 +10,7 @@ namespace ChatServe.Api.Dashboard;
 
 /// <summary>
 /// AI usage per client and restaurant for a month (Pakistan time): replies, tokens and cost in $ and PKR,
-/// against the client's monthly limit. The admin sees every client; an owner only their own.
+/// against the client's monthly AI reply limit. The admin sees every client; an owner only their own.
 /// The limit is only a warning: the bot keeps replying.
 /// </summary>
 public static class UsageEndpoints
@@ -33,7 +33,7 @@ public static class UsageEndpoints
             var orgs = await db.Organizations.AsNoTracking()
                 .Where(o => own == null || o.Id == own)
                 .OrderBy(o => o.Name)
-                .Select(o => new { o.Id, o.Name, o.MonthlyAiBudget, o.IsActive })
+                .Select(o => new { o.Id, o.Name, o.MonthlyReplyLimit, o.IsActive })
                 .ToListAsync(ct);
             var orgIds = orgs.Select(o => o.Id).ToList();
             var restaurants = await db.Restaurants.AsNoTracking()
@@ -76,11 +76,11 @@ public static class UsageEndpoints
                     Usage = Line(replies.Concat(extra).Where(t => t.RestaurantId == r.Id)),
                 }).ToList();
                 var usage = Line(replies.Concat(extra).Where(t => rs.Any(r => r.Id == t.RestaurantId)));
-                int? percent = o.MonthlyAiBudget is > 0 ? (int)Math.Round(usage.CostPkr * 100 / o.MonthlyAiBudget.Value) : null;
+                int? percent = o.MonthlyReplyLimit is > 0 ? (int)Math.Round(usage.Replies * 100m / o.MonthlyReplyLimit.Value) : null;
                 return new
                 {
-                    o.Id, o.Name, o.IsActive, o.MonthlyAiBudget,
-                    Remaining = o.MonthlyAiBudget is { } b ? Math.Max(0, b - usage.CostPkr) : (decimal?)null,
+                    o.Id, o.Name, o.IsActive, o.MonthlyReplyLimit,
+                    RemainingReplies = o.MonthlyReplyLimit is { } l ? Math.Max(0, l - usage.Replies) : (int?)null,
                     Percent = percent,
                     Warning = percent >= p.WarnAtPercent,
                     OverLimit = percent >= 100,
@@ -99,15 +99,16 @@ public static class UsageEndpoints
             });
         });
 
-        admin.MapPut("/clients/{id:int}/budget", async (int id, BudgetRequest req, AppDbContext db, CancellationToken ct) =>
+        admin.MapPut("/clients/{id:int}/limit", async (int id, LimitRequest req, AppDbContext db, CancellationToken ct) =>
         {
             var org = await db.Organizations.FirstOrDefaultAsync(o => o.Id == id, ct);
             if (org is null) return Results.NotFound();
-            if (req.MonthlyAiBudget is < 0)
+            if (req.MonthlyReplyLimit is < 0)
                 return RestaurantEndpoints.Bad("The limit can't be negative.");
-            org.MonthlyAiBudget = req.MonthlyAiBudget is > 0 ? req.MonthlyAiBudget : null;
+            org.MonthlyReplyLimit = req.MonthlyReplyLimit is > 0 ? req.MonthlyReplyLimit : null;
+            org.UsageAlertLevel = 0; // a new limit: alerts can fire again
             await db.SaveChangesAsync(ct);
-            return Results.Ok(new { org.Id, org.MonthlyAiBudget });
+            return Results.Ok(new { org.Id, org.MonthlyReplyLimit });
         });
     }
 
@@ -120,5 +121,5 @@ public static class UsageEndpoints
     public sealed record UsageLine(int Replies, long InputTokens, long OutputTokens, long CacheReadTokens, long CacheWriteTokens,
         decimal CostUsd, decimal CostPkr);
 
-    public sealed record BudgetRequest(decimal? MonthlyAiBudget);
+    public sealed record LimitRequest(int? MonthlyReplyLimit);
 }

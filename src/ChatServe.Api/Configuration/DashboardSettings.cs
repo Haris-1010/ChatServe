@@ -81,7 +81,9 @@ public static class SettingsCatalog
         new("Usage:PkrPerUsd", "AI cost", "Dollar rate (PKR per $)", SettingKind.Decimal,
             "Used to show AI cost in rupees. Default 280."),
         new("Usage:WarnAtPercent", "AI cost", "Warn at (% of monthly limit)", SettingKind.Number,
-            "Clients over this share of their monthly AI limit are highlighted. Default 80."),
+            "Clients over this share of their monthly AI reply limit are highlighted and you get a WhatsApp alert. Default 80."),
+        new("Usage:AdminWhatsAppNumber", "AI cost", "Your WhatsApp number for usage alerts", SettingKind.Text,
+            "For example 923001234567. You get a WhatsApp message when a client reaches the warning % and 100% of its monthly replies. It is sent from the WhatsApp number above (Phone number ID), so message that number once a day (24-hour window)."),
 
         new("Bot:UseAi", "Bot", "Reply with AI", SettingKind.Bool,
             "OFF = a simple welcome message (no AI cost). ON = Claude answers from the menu."),

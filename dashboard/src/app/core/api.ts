@@ -119,7 +119,7 @@ export interface UsageLine {
   costUsd: number; costPkr: number;
 }
 export interface UsageClient {
-  id: number; name: string; isActive: boolean; monthlyAiBudget: number | null; remaining: number | null;
+  id: number; name: string; isActive: boolean; monthlyReplyLimit: number | null; remainingReplies: number | null;
   percent: number | null; warning: boolean; overLimit: boolean; usage: UsageLine;
   restaurants: { id: number; name: string; usage: UsageLine }[];
 }
@@ -168,7 +168,7 @@ export class Api {
   restaurant(rid: number) { return this.get<RestaurantProfile>(`/api/restaurants/${rid}`); }
   saveRestaurant(rid: number, p: RestaurantProfile) { return this.put<RestaurantProfile>(`/api/restaurants/${rid}`, p); }
   usage(month?: string) { return this.get<UsageReport>('/api/usage', month ? { month } : undefined); }
-  setBudget(clientId: number, monthlyAiBudget: number | null) { return this.put<{ id: number; monthlyAiBudget: number | null }>(`/api/clients/${clientId}/budget`, { monthlyAiBudget }); }
+  setReplyLimit(clientId: number, monthlyReplyLimit: number | null) { return this.put<{ id: number; monthlyReplyLimit: number | null }>(`/api/clients/${clientId}/limit`, { monthlyReplyLimit }); }
   training(rid: number) { return this.get<Training>(`/api/restaurants/${rid}/training`); }
   saveTraining(rid: number, text: string) { return this.put<Training>(`/api/restaurants/${rid}/training`, { text }); }
   importTraining(rid: number, file: TrainingFile) { return this.post<{ text: string }>(`/api/restaurants/${rid}/training/import`, file); }

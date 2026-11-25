@@ -28,7 +28,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         b.Entity<Organization>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(200);
-            e.Property(x => x.MonthlyAiBudget).HasPrecision(12, 2);
+            e.Property(x => x.UsageAlertMonth).HasMaxLength(7);
         });
 
         b.Entity<AiUsageLog>(e =>

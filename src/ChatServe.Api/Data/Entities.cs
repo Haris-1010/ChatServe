@@ -14,8 +14,12 @@ public sealed class Organization
     public bool IsActive { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-    /// <summary>The client's monthly AI allowance in PKR (from their package). Only a warning when it runs out; the bot keeps working.</summary>
-    public decimal? MonthlyAiBudget { get; set; }
+    /// <summary>AI replies included in the client's package per month. Only a warning when it runs out; the bot keeps working.</summary>
+    public int? MonthlyReplyLimit { get; set; }
+
+    /// <summary>Which usage alert the admin already got this month (so each one is sent once): month "2026-11", level 1 = warning, 2 = limit reached.</summary>
+    public string? UsageAlertMonth { get; set; }
+    public int UsageAlertLevel { get; set; }
 
     public List<Restaurant> Restaurants { get; set; } = [];
 }

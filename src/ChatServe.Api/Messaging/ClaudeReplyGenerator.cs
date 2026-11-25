@@ -22,7 +22,8 @@ public sealed class ClaudeReplyGenerator(
     ILogger<ClaudeReplyGenerator> logger,
     StaffCommandHandler? staffCommands = null,
     IVoiceTranscriber? voice = null,
-    IWhatsAppClient? media = null) : IReplyGenerator
+    IWhatsAppClient? media = null,
+    UsageAlerts? usageAlerts = null) : IReplyGenerator
 {
     public const string NonTextReply =
         "Sorry, I can only read text messages for now. Please type your question. 🙏";
@@ -165,6 +166,12 @@ public sealed class ClaudeReplyGenerator(
 
         foreach (var alert in staffAlerts)
             await staff.NotifyAsync(restaurant, alert, ct);
+
+        if (result is not null && usageAlerts is not null)
+        {
+            try { await usageAlerts.CheckAsync(restaurant.OrganizationId, ct); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { logger.LogError(ex, "Usage alert check failed"); }
+        }
 
         return reply;
     }

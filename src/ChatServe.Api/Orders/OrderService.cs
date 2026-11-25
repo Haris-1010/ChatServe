@@ -14,7 +14,8 @@ public sealed record DraftRequest(
     string? DeliveryAddress,
     string? DeliveryArea,
     string? PaymentMethod,
-    string? Notes);
+    string? Notes,
+    bool AddressConfirmed = false);
 
 /// <summary>Either the order, or an error (sent back to the AI so it can get the right details from the customer).</summary>
 public sealed record ServiceResult<T>(T? Value, string? Error) where T : class
@@ -84,6 +85,10 @@ public sealed class OrderService(AppDbContext db, IOptionsMonitor<OrderOptions> 
             address = Clean(req.DeliveryAddress, 300);
             if (address is null || address.Length < 5)
                 return ServiceResult<Order>.Fail("Full delivery address (house/street/block) is missing. Ask the customer for it.");
+
+            // "House 34, Paragon City, Johar Town": two different places. Ask the customer before anything goes to the kitchen.
+            if (!req.AddressConfirmed && AddressCheck.Problem(address, zone, restaurant.DeliveryZones) is { } addressProblem)
+                return ServiceResult<Order>.Fail(addressProblem);
 
             if (restaurant.MinimumOrder is { } min && subtotal < min)
                 return ServiceResult<Order>.Fail(

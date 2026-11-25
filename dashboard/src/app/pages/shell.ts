@@ -141,8 +141,8 @@ export class Shell implements OnInit {
       const near = u.clients.filter(c => c.warning);
       if (near.length === 0) return;
       this.usageWarning.set(this.auth.isAdmin()
-        ? `${near.length} client(s) near or over their monthly AI limit: ${near.map(c => `${c.name} ${c.percent}%`).join(', ')}`
-        : `You have used ${near[0].percent}% of this month's AI limit.`);
+        ? `${near.length} client(s) near or over their monthly AI replies: ${near.map(c => `${c.name} ${c.percent}%`).join(', ')}`
+        : `You have used ${near[0].percent}% of this month's AI replies (${near[0].usage.replies} of ${near[0].monthlyReplyLimit}).`);
     } catch { /* the banner is optional */ }
   }
 

@@ -14,6 +14,7 @@ public sealed class UsageOptions
     public decimal CacheWriteUsdPerMillion { get; set; } = 0.125m;
     public decimal PkrPerUsd { get; set; } = 280m;
     public int WarnAtPercent { get; set; } = 80;
+    public string AdminWhatsAppNumber { get; set; } = string.Empty;
 
     public decimal CostUsd(long input, long output, long cacheRead, long cacheWrite) =>
         (input * InputUsdPerMillion + output * OutputUsdPerMillion +

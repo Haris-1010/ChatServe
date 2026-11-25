@@ -96,7 +96,7 @@ public static partial class CustomerText
             OrderStatus.OutForDelivery => $"🛵 Aap ka order *#{o.Id}* le kar rider nikal gaya hai. Total: *{total}*",
             OrderStatus.Completed => o.Type == OrderType.Takeaway
                 ? $"🎉 Aap ka order *#{o.Id}* tayyar hai, aa kar le jayen. Shukriya!"
-                : $"🙏 Aap ka order *#{o.Id}* pohanch gaya. Hamein chunne ka shukriya! Khana kaisa laga, zaroor batayein.",
+                : $"🙏 Aap ka order *#{o.Id}* deliver kar diya gaya hai. Kya aap ko order mil gaya? 😊\nKoi cheez kam ya ghalat ho to yahin bata dein. Khana kaisa laga, zaroor batayein!",
             OrderStatus.Cancelled => $"Maaf kijiye, aap ka order *#{o.Id}* cancel ho gaya hai. Koi sawal ho to yahin message kar dein.",
             _ => $"Order *#{o.Id}*: {OrderFormatter.StatusText(o.Status)}",
         };

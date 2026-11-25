@@ -19,7 +19,7 @@ import { errorText, Toasts } from '../core/toast';
         <div class="stats">
           <div class="stat"><div class="stat-label">All clients, {{ monthName(r.month) }}</div>
             <div class="stat-value">Rs {{ r.total.costPkr | number:'1.0-0' }}</div>
-            <div class="stat-sub">$ {{ r.total.costUsd | number:'1.2-2' }} · {{ r.total.replies | number }} AI replies</div></div>
+            <div class="stat-sub">$ {{ r.total.costUsd | number:'1.2-4' }} · {{ r.total.replies | number }} AI replies</div></div>
           <div class="stat"><div class="stat-label">Tokens</div>
             <div class="stat-value small-value">{{ tokens(r.total) | number }}</div>
             <div class="stat-sub">{{ r.total.inputTokens | number }} in · {{ r.total.outputTokens | number }} out</div></div>
@@ -32,24 +32,25 @@ import { errorText, Toasts } from '../core/toast';
           <div class="client-head">
             <div>
               <h2>{{ c.name }} @if (!c.isActive) { <span class="pill warn">Suspended</span> }</h2>
-              <div class="muted small">{{ c.usage.replies | number }} AI replies · {{ tokens(c.usage) | number }} tokens · $ {{ c.usage.costUsd | number:'1.2-2' }}</div>
+              <div class="muted small">AI cost Rs {{ c.usage.costPkr | number:'1.0-0' }} · $ {{ c.usage.costUsd | number:'1.2-4' }} · {{ tokens(c.usage) | number }} tokens</div>
             </div>
             <div class="cost">
-              <div class="big">Rs {{ c.usage.costPkr | number:'1.0-0' }}</div>
-              @if (c.monthlyAiBudget) {
-                <div class="small">of Rs {{ c.monthlyAiBudget | number:'1.0-0' }} · <b>Rs {{ c.remaining | number:'1.0-0' }} left</b></div>
+              @if (c.monthlyReplyLimit) {
+                <div class="big">{{ c.usage.replies | number }} <span class="of">/ {{ c.monthlyReplyLimit | number }} replies</span></div>
+                <div class="small"><b>{{ c.remainingReplies | number }} replies left</b> this month</div>
               } @else {
+                <div class="big">{{ c.usage.replies | number }} <span class="of">replies</span></div>
                 <div class="small muted">No monthly limit set</div>
               }
             </div>
           </div>
 
-          @if (c.monthlyAiBudget) {
+          @if (c.monthlyReplyLimit) {
             <div class="bar"><div [style.width.%]="min(c.percent ?? 0, 100)"></div></div>
             <div class="small">
               {{ c.percent }}% used
-              @if (c.overLimit) { · <b class="danger">Limit reached. The bot keeps replying; extra usage is charged as agreed.</b> }
-              @else if (c.warning) { · <b class="warn-text">Close to the monthly limit.</b> }
+              @if (c.overLimit) { · <b class="danger">This month's replies are used up. The bot keeps replying.</b> }
+              @else if (c.warning) { · <b class="warn-text">Close to this month's limit.</b> }
             </div>
           }
 
@@ -67,7 +68,7 @@ import { errorText, Toasts } from '../core/toast';
 
           @if (auth.isAdmin()) {
             <form class="budget" (ngSubmit)="saveBudget(c)">
-              <label class="field"><span>Monthly AI limit (Rs)</span>
+              <label class="field"><span>AI replies per month (package)</span>
                 <input type="number" min="0" step="100" name="b{{ c.id }}" [(ngModel)]="budgets[c.id]" placeholder="e.g. 3000 (empty = no limit)" /></label>
               <button class="btn" [disabled]="busy()">Save limit</button>
             </form>
@@ -78,8 +79,8 @@ import { errorText, Toasts } from '../core/toast';
       }
 
       <p class="muted small">
-        Costs are estimates from the tokens each AI reply used, at the prices in Settings. Reading training screenshots is included.
-        The limit is only a warning: the bot never stops because of it.
+        One reply = one AI answer to a customer message. Costs are estimates from the tokens used, at the prices in Settings
+        (reading training screenshots is included). The limit is only a warning: the bot never stops because of it.
       </p>
     }
   `,
@@ -94,6 +95,7 @@ import { errorText, Toasts } from '../core/toast';
     .client-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
     .cost { text-align: right; }
     .big { font-size: 22px; font-weight: 700; }
+    .big .of { font-size: 14px; font-weight: 500; opacity: .7; }
     .bar { height: 8px; border-radius: 6px; background: rgba(127,127,127,.2); overflow: hidden; }
     .bar div { height: 100%; background: var(--primary); }
     .client.warn .bar div { background: #f5a623; }
@@ -123,7 +125,7 @@ export class UsagePage implements OnInit {
       const r = await this.api.usage(month);
       this.report.set(r);
       this.month.set(r.month);
-      this.budgets = Object.fromEntries(r.clients.map(c => [c.id, c.monthlyAiBudget]));
+      this.budgets = Object.fromEntries(r.clients.map(c => [c.id, c.monthlyReplyLimit]));
     } catch (e) { this.toasts.error(errorText(e)); }
   }
 
@@ -133,7 +135,7 @@ export class UsagePage implements OnInit {
     this.busy.set(true);
     try {
       const v = this.budgets[c.id];
-      await this.api.setBudget(c.id, v ? +v : null);
+      await this.api.setReplyLimit(c.id, v ? Math.round(+v) : null);
       this.toasts.ok(`Limit saved for ${c.name}.`);
       await this.load(this.month());
     } catch (e) {

@@ -278,7 +278,7 @@ public static class OperationsEndpoints
         OrderStatus.OutForDelivery => $"🛵 Your order *#{o.Id}* is out for delivery. Total: *{OrderFormatter.TotalText(o, currency)}*",
         OrderStatus.Completed => o.Type == OrderType.Takeaway
             ? $"🎉 Your order *#{o.Id}* is ready for pickup. Thank you!"
-            : $"🙏 Order *#{o.Id}* is complete. Thank you for choosing us! Let us know how you liked the food.",
+            : $"🙏 Your order *#{o.Id}* has been delivered. Did you receive it? 😊\nIf anything is missing or wrong, just reply here. We'd love to hear how you liked the food!",
         OrderStatus.Cancelled => $"Sorry, your order *#{o.Id}* has been cancelled. Message us here if you have any questions.",
         _ => $"Order *#{o.Id}* status: {o.Status}",
     };

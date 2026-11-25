@@ -474,14 +474,20 @@ namespace ChatServe.Api.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
-                    b.Property<decimal?>("MonthlyAiBudget")
-                        .HasPrecision(12, 2)
-                        .HasColumnType("numeric(12,2)");
+                    b.Property<int?>("MonthlyReplyLimit")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<int>("UsageAlertLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UsageAlertMonth")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
 
                     b.HasKey("Id");
 

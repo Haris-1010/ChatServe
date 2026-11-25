@@ -59,17 +59,23 @@ public class UsageTests
         await AddReplyAsync(factory, butt, 1_000_000, 200_000);
         await AddReplyAsync(factory, demo, 500_000, 0);
 
-        (await admin.PutAsJsonAsync($"/api/clients/{oid}/budget", new { monthlyAiBudget = 120 })).EnsureSuccessStatusCode();
+        // Package: 2 replies a month → 2 used = 100%
+        (await admin.PutAsJsonAsync($"/api/clients/{oid}/limit", new { monthlyReplyLimit = 2 })).EnsureSuccessStatusCode();
 
         var all = await admin.GetFromJsonAsync<JsonElement>("/api/usage");
         Assert.Equal(2, all.GetProperty("clients").GetArrayLength());
         var b = Client(all, "Butt Foods");
         Assert.Equal(2, b.GetProperty("usage").GetProperty("replies").GetInt32());
         Assert.Equal(112m, b.GetProperty("usage").GetProperty("costPkr").GetDecimal());
-        Assert.Equal(93, b.GetProperty("percent").GetInt32());
-        Assert.True(b.GetProperty("warning").GetBoolean());
-        Assert.False(b.GetProperty("overLimit").GetBoolean());
-        Assert.Equal(8m, b.GetProperty("remaining").GetDecimal());
+        Assert.Equal(100, b.GetProperty("percent").GetInt32());
+        Assert.True(b.GetProperty("overLimit").GetBoolean());
+        Assert.Equal(0, b.GetProperty("remainingReplies").GetInt32());
+
+        (await admin.PutAsJsonAsync($"/api/clients/{oid}/limit", new { monthlyReplyLimit = 10 })).EnsureSuccessStatusCode();
+        b = Client(await admin.GetFromJsonAsync<JsonElement>("/api/usage"), "Butt Foods");
+        Assert.Equal(20, b.GetProperty("percent").GetInt32());
+        Assert.False(b.GetProperty("warning").GetBoolean());
+        Assert.Equal(8, b.GetProperty("remainingReplies").GetInt32());
 
         // The owner sees only their own client, and can't change the limit
         var owner = factory.CreateClient();
@@ -79,7 +85,7 @@ public class UsageTests
 
         var mine = await owner.GetFromJsonAsync<JsonElement>("/api/usage");
         Assert.Equal("Butt Foods", Assert.Single(mine.GetProperty("clients").EnumerateArray()).GetProperty("name").GetString());
-        Assert.Equal(HttpStatusCode.Forbidden, (await owner.PutAsJsonAsync($"/api/clients/{oid}/budget", new { monthlyAiBudget = 99999 })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await owner.PutAsJsonAsync($"/api/clients/{oid}/limit", new { monthlyReplyLimit = 99999 })).StatusCode);
 
         // Another month has nothing
         var old = await admin.GetFromJsonAsync<JsonElement>("/api/usage?month=2020-01");

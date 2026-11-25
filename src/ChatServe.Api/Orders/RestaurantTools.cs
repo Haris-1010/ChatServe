@@ -51,8 +51,9 @@ public static class RestaurantTools
                 ["delivery_area"] = new { type = "string", @enum = areas, description = $"Delivery area from the list. \"{NoArea}\" if not delivery." },
                 ["payment_method"] = new { type = "string", description = "Payment method the customer chose; empty string if they didn't say." },
                 ["notes"] = new { type = "string", description = "Any other instruction for the whole order, or empty string." },
+                ["address_confirmed"] = new { type = "boolean", description = "false normally. true only after place_order said the address looks like a different place and the customer then confirmed the address and area are correct." },
             },
-            required = new[] { "items", "order_type", "customer_name", "delivery_address", "delivery_area", "payment_method", "notes" },
+            required = new[] { "items", "order_type", "customer_name", "delivery_address", "delivery_area", "payment_method", "notes", "address_confirmed" },
             additionalProperties = false,
         };
 
@@ -140,7 +141,8 @@ public sealed class OrderToolExecutor(
 
                 var result = await orders.SaveDraftAsync(restaurant, customer, new DraftRequest(
                     items, type, Str(input, "customer_name"), Str(input, "delivery_address"),
-                    area == RestaurantTools.NoArea ? null : area, Str(input, "payment_method"), Str(input, "notes")), now, ct);
+                    area == RestaurantTools.NoArea ? null : area, Str(input, "payment_method"), Str(input, "notes"),
+                    AddressConfirmed: input.TryGetValue("address_confirmed", out var ac) && ac.ValueKind == JsonValueKind.True), now, ct);
 
                 if (result.Value is null)
                     return new ToolOutcome(result.Error!, IsError: true);

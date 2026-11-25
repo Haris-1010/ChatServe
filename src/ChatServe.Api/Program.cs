@@ -58,6 +58,7 @@ builder.Services.AddOptions<OrderOptions>().Bind(builder.Configuration.GetSectio
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<IStaffNotifier, WhatsAppStaffNotifier>();
 builder.Services.AddScoped<StaffCommandHandler>();
+builder.Services.AddScoped<UsageAlerts>();
 builder.Services.AddScoped<SimulationContext>();
 
 // ---- Message pipeline ----
