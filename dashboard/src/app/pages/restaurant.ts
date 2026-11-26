@@ -5,10 +5,11 @@ import { Api, CurrentRestaurant, RestaurantProfile } from '../core/api';
 import { Auth } from '../core/auth';
 import { onRestaurant } from '../core/page';
 import { errorText, Toasts } from '../core/toast';
+import { WhatsAppConnectionCard } from './whatsapp-connection';
 
 @Component({
   selector: 'app-restaurant',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, WhatsAppConnectionCard],
   template: `
     <div class="page-head"><h1>Restaurant info</h1></div>
 
@@ -40,6 +41,10 @@ import { errorText, Toasts } from '../core/toast';
       </form>
     }
 
+    @if (auth.isAdmin() && current.id(); as id) {
+      <app-whatsapp-connection [rid]="id" />
+    }
+
     @if (auth.isAdmin()) {
       <p class="muted small">To add another restaurant or branch, or a login for this client, go to <a routerLink="/clients">All clients</a>.</p>
     }
@@ -52,7 +57,7 @@ export class RestaurantPage {
   protected auth = inject(Auth);
   p = signal<RestaurantProfile | null>(null);
   busy = signal(false);
-  private current = onRestaurant(rid => this.load(rid));
+  protected current = onRestaurant(rid => this.load(rid));
   private rid = computed(() => this.current.id()!);
 
   async load(rid: number) {

@@ -21,8 +21,11 @@ public interface IWhatsAppClient
         CancellationToken ct = default) =>
         SendTextAsync(phoneNumberId, to, interactive.AsPlainText(body), replyToMessageId: null, ct);
 
-    /// <summary>Downloads a media file a customer sent (e.g. a voice note): first its URL from the Graph API, then the bytes.</summary>
-    Task<MediaFile> DownloadMediaAsync(string mediaId, CancellationToken ct = default);
+    /// <summary>
+    /// Downloads a media file a customer sent (e.g. a voice note): first its URL from the Graph API, then the bytes.
+    /// <paramref name="phoneNumberId"/> picks the token (numbers connected with Embedded Signup have their own).
+    /// </summary>
+    Task<MediaFile> DownloadMediaAsync(string mediaId, string? phoneNumberId = null, CancellationToken ct = default);
 
     /// <summary>Shows the customer blue ticks and starts the "typing..." indicator.</summary>
     Task MarkAsReadAsync(string phoneNumberId, string messageId, bool showTyping = true,
@@ -42,7 +45,12 @@ public sealed class WhatsAppApiException(string message, int statusCode, string?
 /// A plain HttpClient wrapper for the Graph API (no SDK).
 /// POST {base}/{version}/{phone-number-id}/messages
 /// </summary>
-public sealed class WhatsAppClient(HttpClient http, IOptionsMonitor<WhatsAppOptions> options, ILogger<WhatsAppClient> logger)
+public sealed class WhatsAppClient(
+    HttpClient http,
+    IOptionsMonitor<WhatsAppOptions> options,
+    WhatsAppTokens tokens,
+    SentMessages sent,
+    ILogger<WhatsAppClient> logger)
     : IWhatsAppClient
 {
     /// <summary>WhatsApp text messages are limited to 4096 characters.</summary>
@@ -75,6 +83,7 @@ public sealed class WhatsAppClient(HttpClient http, IOptionsMonitor<WhatsAppOpti
             ? msgs[0].GetProperty("id").GetString()
             : null;
 
+        sent.Remember(id);
         logger.LogInformation("Reply sent to {To} (wamid {MessageId})", Mask(to), id);
         return id;
     }
@@ -95,6 +104,7 @@ public sealed class WhatsAppClient(HttpClient http, IOptionsMonitor<WhatsAppOpti
             var id = doc.RootElement.TryGetProperty("messages", out var msgs) && msgs.GetArrayLength() > 0
                 ? msgs[0].GetProperty("id").GetString()
                 : null;
+            sent.Remember(id);
             logger.LogInformation("Reply with {Count} options sent to {To} (wamid {MessageId})", interactive.Options.Count, Mask(to), id);
             return id;
         }
@@ -179,12 +189,13 @@ public sealed class WhatsAppClient(HttpClient http, IOptionsMonitor<WhatsAppOpti
     /// <summary>Voice notes are small; refuse anything big so a strange file can't fill memory.</summary>
     private const long MaxMediaBytes = 16 * 1024 * 1024;
 
-    public async Task<MediaFile> DownloadMediaAsync(string mediaId, CancellationToken ct = default)
+    public async Task<MediaFile> DownloadMediaAsync(string mediaId, string? phoneNumberId = null, CancellationToken ct = default)
     {
         var opts = options.CurrentValue;
+        var token = await tokens.ForPhoneNumberAsync(phoneNumberId, ct);
         using var infoRequest = new HttpRequestMessage(HttpMethod.Get,
             $"{opts.GraphApiBaseUrl.TrimEnd('/')}/{opts.GraphApiVersion}/{Uri.EscapeDataString(mediaId)}");
-        infoRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", opts.AccessToken);
+        infoRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         using var infoResponse = await http.SendAsync(infoRequest, ct);
         var infoBody = await infoResponse.Content.ReadAsStringAsync(ct);
         if (!infoResponse.IsSuccessStatusCode)
@@ -197,7 +208,7 @@ public sealed class WhatsAppClient(HttpClient http, IOptionsMonitor<WhatsAppOpti
             throw new WhatsAppApiException("Media info had no download URL", 0, infoBody);
 
         using var fileRequest = new HttpRequestMessage(HttpMethod.Get, uri);
-        fileRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", opts.AccessToken);
+        fileRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         using var fileResponse = await http.SendAsync(fileRequest, HttpCompletionOption.ResponseHeadersRead, ct);
         if (!fileResponse.IsSuccessStatusCode)
             throw new WhatsAppApiException($"Media download returned {(int)fileResponse.StatusCode}", (int)fileResponse.StatusCode, null);
@@ -220,7 +231,7 @@ public sealed class WhatsAppClient(HttpClient http, IOptionsMonitor<WhatsAppOpti
             // StringContent: the body is buffered and a Content-Length header is sent (not chunked).
             Content = new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json")
         };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", opts.AccessToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.ForPhoneNumberAsync(phoneNumberId, ct));
 
         using var response = await http.SendAsync(request, ct);
         var content = await response.Content.ReadAsStringAsync(ct);

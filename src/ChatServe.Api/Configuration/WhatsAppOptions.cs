@@ -31,6 +31,12 @@ public sealed class WhatsAppOptions
     /// <summary>App Settings &gt; Basic &gt; App secret. Used to check X-Hub-Signature-256.</summary>
     public string AppSecret { get; set; } = string.Empty;
 
+    /// <summary>App settings &gt; Basic &gt; App ID. Embedded Signup (connecting a client's own number) needs it.</summary>
+    public string AppId { get; set; } = string.Empty;
+
+    /// <summary>The Facebook Login for Business configuration used by Embedded Signup.</summary>
+    public string EmbeddedSignupConfigId { get; set; } = string.Empty;
+
     /// <summary>Always true in production. Can be false for local testing.</summary>
     public bool ValidateSignature { get; set; } = true;
 }

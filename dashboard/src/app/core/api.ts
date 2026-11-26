@@ -156,6 +156,18 @@ export interface UsageReport {
   clients: UsageClient[];
 }
 
+export type WhatsAppMode = 'CloudApi' | 'Coexistence';
+export interface WhatsAppConnection {
+  restaurantId: number; phoneNumberId: string; mode: WhatsAppMode; whatsAppBusinessAccountId: string | null; hasOwnToken: boolean;
+  connectedAt: string | null; historySyncRequestedAt: string | null; historyMessagesImported: number;
+  pauseBotOnPhoneReply: boolean; lastPhoneReplyAt: string | null;
+}
+export interface SignupConfig { appId: string; configId: string; graphApiVersion: string; ready: boolean; missing: string[]; }
+export interface ConnectStep { name: string; ok: boolean; message: string; }
+export interface ConnectResult { ok: boolean; steps: ConnectStep[]; connection: WhatsAppConnection; }
+export interface ConnectRequest { code: string; wabaId: string; phoneNumberId: string | null; mode: WhatsAppMode; pin?: string; }
+export interface ConnectionUpdate { mode: WhatsAppMode; whatsAppBusinessAccountId: string | null; accessToken: string | null; pauseBotOnPhoneReply: boolean; }
+
 export interface Training { text: string | null; maxLength: number; }
 export interface TrainingFile { fileName: string; text?: string; imageBase64?: string; mediaType?: string; }
 
@@ -207,6 +219,12 @@ export class Api {
   rejectRequest(id: number, adminNote: string) { return this.post<void>(`/api/reply-requests/${id}/reject`, { adminNote }); }
   topUp(clientId: number, replies: number) { return this.post<void>(`/api/clients/${clientId}/topup`, { replies }); }
   setReplyLimit(clientId: number, monthlyReplyLimit: number | null) { return this.put<{ id: number; monthlyReplyLimit: number | null }>(`/api/clients/${clientId}/limit`, { monthlyReplyLimit }); }
+  signupConfig() { return this.get<SignupConfig>('/api/whatsapp/signup-config'); }
+  whatsAppConnection(rid: number) { return this.get<WhatsAppConnection>(`/api/restaurants/${rid}/whatsapp`); }
+  updateWhatsAppConnection(rid: number, u: ConnectionUpdate) { return this.put<WhatsAppConnection>(`/api/restaurants/${rid}/whatsapp`, u); }
+  connectWhatsApp(rid: number, r: ConnectRequest) { return this.post<ConnectResult>(`/api/restaurants/${rid}/whatsapp/connect`, r); }
+  syncWhatsAppHistory(rid: number) { return this.post<ConnectResult>(`/api/restaurants/${rid}/whatsapp/sync`); }
+  testRestaurantWhatsApp(rid: number) { return this.post<TestResult>(`/api/restaurants/${rid}/whatsapp/test`); }
   training(rid: number) { return this.get<Training>(`/api/restaurants/${rid}/training`); }
   saveTraining(rid: number, text: string) { return this.put<Training>(`/api/restaurants/${rid}/training`, { text }); }
   importTraining(rid: number, file: TrainingFile) { return this.post<{ text: string }>(`/api/restaurants/${rid}/training/import`, file); }

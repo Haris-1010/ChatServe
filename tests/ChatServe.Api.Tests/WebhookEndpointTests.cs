@@ -35,7 +35,7 @@ public sealed class FakeWhatsAppClient : IWhatsAppClient
 
     public Dictionary<string, MediaFile> Media { get; } = new();
 
-    public Task<MediaFile> DownloadMediaAsync(string mediaId, CancellationToken ct = default) =>
+    public Task<MediaFile> DownloadMediaAsync(string mediaId, string? phoneNumberId = null, CancellationToken ct = default) =>
         Media.TryGetValue(mediaId, out var f) ? Task.FromResult(f) : throw new WhatsAppApiException("not found", 404, null);
 
     public Task MarkAsReadAsync(string phoneNumberId, string messageId, bool showTyping = true, CancellationToken ct = default)

@@ -127,6 +127,7 @@ public static class DashboardSetup
         admin.MapSettingsEndpoints();
         admin.MapUserAdminEndpoints();
         admin.MapClientEndpoints();
+        admin.MapWhatsAppConnectEndpoints();
         loggedIn.MapUsageEndpoints(admin);
         loggedIn.MapReplyRequestEndpoints(admin);
 

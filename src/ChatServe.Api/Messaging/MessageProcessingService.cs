@@ -61,6 +61,14 @@ public sealed class MessageProcessingService(
         using var _ = await _customerLock.AcquireAsync(message.PhoneNumberId + ":" + message.From, ct);
 
         await using var scope = scopeFactory.CreateAsyncScope();
+
+        // Coexistence: the owner answered from the phone. Save it and pause the bot; never reply to it.
+        if (message.Kind == MessageKind.PhoneReply)
+        {
+            await scope.ServiceProvider.GetRequiredService<PhoneAppSync>().SavePhoneReplyAsync(message, ct);
+            return;
+        }
+
         var whatsApp = scope.ServiceProvider.GetRequiredService<IWhatsAppClient>();
         var replyGenerator = scope.ServiceProvider.GetRequiredService<IReplyGenerator>();
 

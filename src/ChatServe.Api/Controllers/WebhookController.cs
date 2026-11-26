@@ -13,6 +13,7 @@ namespace ChatServe.Api.Controllers;
 public sealed class WebhookController(
     IOptionsMonitor<WhatsAppOptions> options,
     IMessageQueue queue,
+    IPhoneSyncQueue phoneSync,
     ILogger<WebhookController> logger) : ControllerBase
 {
     /// <summary>
@@ -75,10 +76,20 @@ public sealed class WebhookController(
         if (payload is null)
             return BadRequest();
 
-        foreach (var message in WebhookParser.ExtractMessages(payload, opts.PhoneNumberId))
+        // Customer messages, and (coexistence) replies the owner sent from the WhatsApp Business app.
+        // Both go on the same queue so one customer's messages are handled in order.
+        foreach (var message in WebhookParser.ExtractMessages(payload, opts.PhoneNumberId)
+                     .Concat(WebhookParser.ExtractPhoneReplies(payload, opts.PhoneNumberId)))
         {
             if (!queue.TryEnqueue(message))
                 logger.LogError("Message queue full, dropped {MessageId}", message.MessageId);
+        }
+
+        // Coexistence: old chats and contacts from the owner's phone (imported in the background).
+        foreach (var batch in WebhookParser.ExtractPhoneSync(payload, opts.PhoneNumberId))
+        {
+            if (!phoneSync.TryEnqueue(batch))
+                logger.LogError("Phone sync queue full, dropped a batch of {Count} messages", batch.Messages.Count);
         }
 
         return Ok();
