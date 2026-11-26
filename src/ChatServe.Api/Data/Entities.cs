@@ -94,10 +94,57 @@ public sealed class Restaurant
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    // ---- WhatsApp connection ----
+
+    /// <summary>
+    /// CloudApi: the number lives only on the API (the classic way; it can't be used in the WhatsApp app).
+    /// Coexistence: the same number also stays in the owner's WhatsApp Business app; replies the owner sends
+    /// from the phone reach us as "echoes" and pause the bot for that customer.
+    /// </summary>
+    public WhatsAppMode WhatsAppMode { get; set; } = WhatsAppMode.CloudApi;
+
+    /// <summary>The WhatsApp Business Account (WABA) the number belongs to. Set by Embedded Signup.</summary>
+    public string? WhatsAppBusinessAccountId { get; set; }
+
+    /// <summary>
+    /// The business token Meta gave for this number's WABA (Embedded Signup). Null = the app-wide token in Settings
+    /// is used (the classic setup). Never sent to the dashboard.
+    /// </summary>
+    public string? WhatsAppAccessToken { get; set; }
+
+    public DateTimeOffset? WhatsAppConnectedAt { get; set; }
+
+    /// <summary>When we last asked Meta to send the phone's contacts and chat history (allowed within 24 hours of onboarding).</summary>
+    public DateTimeOffset? HistorySyncRequestedAt { get; set; }
+
+    /// <summary>How many old messages were imported from the phone so far.</summary>
+    public int HistoryMessagesImported { get; set; }
+
+    /// <summary>Coexistence: pause the bot for a customer when the owner replies to them from the phone.</summary>
+    public bool PauseBotOnPhoneReply { get; set; } = true;
+
+    /// <summary>Last time the owner replied from the WhatsApp Business app (coexistence echo).</summary>
+    public DateTimeOffset? LastPhoneReplyAt { get; set; }
+
     public List<MenuItem> MenuItems { get; set; } = [];
     public List<Deal> Deals { get; set; } = [];
     public List<Faq> Faqs { get; set; } = [];
     public List<DeliveryZone> DeliveryZones { get; set; } = [];
+}
+
+public enum WhatsAppMode { CloudApi = 0, Coexistence = 1 }
+
+/// <summary>
+/// A contact saved in the owner's WhatsApp Business app (coexistence contact sync). Only used to show a name for
+/// customers; contacts are not shown as customers until they message.
+/// </summary>
+public sealed class PhoneContact
+{
+    public long Id { get; set; }
+    public int RestaurantId { get; set; }
+    public required string Phone { get; set; }      // digits only, with country code
+    public required string Name { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
 }
 
 /// <summary>A delivery area and its charge. The AI can only take orders for these areas (an enum in the tool schema).</summary>

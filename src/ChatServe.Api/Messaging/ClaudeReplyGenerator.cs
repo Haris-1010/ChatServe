@@ -211,7 +211,7 @@ public sealed class ClaudeReplyGenerator(
             return null;
         try
         {
-            var file = await media.DownloadMediaAsync(message.MediaId, ct);
+            var file = await media.DownloadMediaAsync(message.MediaId, message.PhoneNumberId, ct);
             var text = await voice.TranscribeAsync(file, ct);
             logger.LogInformation("Voice note {MessageId} transcribed ({Bytes} bytes, {Chars} chars)", message.MessageId, file.Data.Length, text?.Length ?? 0);
             return string.IsNullOrWhiteSpace(text) ? null : text.Trim();

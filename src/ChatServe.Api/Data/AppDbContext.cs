@@ -21,6 +21,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<DashboardUser> DashboardUsers => Set<DashboardUser>();
     public DbSet<AiUsageLog> AiUsageLogs => Set<AiUsageLog>();
     public DbSet<ReplyRequest> ReplyRequests => Set<ReplyRequest>();
+    public DbSet<PhoneContact> PhoneContacts => Set<PhoneContact>();
     /// <summary>Login-token keys, kept in the DB so logins survive redeploys (Railway starts a fresh container each time).</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -61,6 +62,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.Currency).HasMaxLength(10);
             e.Property(x => x.MinimumOrder).HasPrecision(10, 2);
             e.Property(x => x.StaffWhatsAppNumber).HasMaxLength(StaffNumbers.MaxStoredLength);
+            e.Property(x => x.WhatsAppMode).HasConversion<string>().HasMaxLength(15);
+            e.Property(x => x.WhatsAppBusinessAccountId).HasMaxLength(50);
+            e.Property(x => x.WhatsAppAccessToken).HasMaxLength(1000);
+        });
+
+        b.Entity<PhoneContact>(e =>
+        {
+            e.HasIndex(x => new { x.RestaurantId, x.Phone }).IsUnique();
+            e.Property(x => x.Phone).HasMaxLength(20);
+            e.Property(x => x.Name).HasMaxLength(100);
+            e.HasOne<Restaurant>().WithMany().HasForeignKey(x => x.RestaurantId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<DeliveryZone>(e =>

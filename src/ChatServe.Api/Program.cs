@@ -33,7 +33,10 @@ builder.Services.AddOptions<BotOptions>()
     .Bind(builder.Configuration.GetSection(BotOptions.SectionName));
 
 builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<SentMessages>();
+builder.Services.AddSingleton<WhatsAppTokens>(); // per-number token (Embedded Signup) or the app-wide one
 builder.Services.AddHttpClient<IWhatsAppClient, WhatsAppClient>(c => c.Timeout = TimeSpan.FromSeconds(20));
+builder.Services.AddHttpClient<MetaGraph>(c => c.Timeout = TimeSpan.FromSeconds(20)); // Embedded Signup / coexistence setup calls
 
 // ---- Database (PostgreSQL) ----
 // ConnectionStrings:Default, or Railway/Render's DATABASE_URL.
@@ -70,6 +73,9 @@ builder.Services.AddScoped<ClaudeReplyGenerator>();
 builder.Services.AddScoped<HelloReplyGenerator>(); // the simple Phase 1 reply (Bot:UseAi = false)
 builder.Services.AddScoped<IReplyGenerator, SwitchingReplyGenerator>();
 builder.Services.AddHostedService<MessageProcessingService>();
+builder.Services.AddSingleton<IPhoneSyncQueue, PhoneSyncQueue>(); // coexistence: history + contacts from the phone
+builder.Services.AddScoped<PhoneAppSync>();
+builder.Services.AddHostedService<PhoneSyncService>();
 
 builder.Services.AddControllers();
 builder.AddDashboard();

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using ChatServe.Api.Ai;
 using ChatServe.Api.Data;
 using ChatServe.Api.Orders;
+using ChatServe.Api.WhatsApp;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChatServe.Api.Dashboard;
@@ -58,7 +59,7 @@ public static class RestaurantEndpoints
                 ? Results.Ok(ToProfile(r))
                 : Results.NotFound());
 
-        one.MapPut("", async (int rid, RestaurantProfile input, ClaimsPrincipal user, AppDbContext db, CancellationToken ct) =>
+        one.MapPut("", async (int rid, RestaurantProfile input, ClaimsPrincipal user, AppDbContext db, WhatsAppTokens tokens, CancellationToken ct) =>
         {
             var r = await db.Restaurants.FirstOrDefaultAsync(x => x.Id == rid, ct);
             if (r is null) return Results.NotFound();
@@ -75,6 +76,8 @@ public static class RestaurantEndpoints
                 return Bad(staffError);
 
             r.Name = input.Name.Trim();
+            tokens.Forget(r.WhatsAppPhoneNumberId);
+            tokens.Forget(phoneId);
             r.WhatsAppPhoneNumberId = phoneId;
             r.IsBotEnabled = input.IsBotEnabled;
             r.BotTone = Clean(input.BotTone);

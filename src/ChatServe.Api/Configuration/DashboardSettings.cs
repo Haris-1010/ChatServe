@@ -50,6 +50,10 @@ public static class SettingsCatalog
             "Always ON in production. Turn OFF only for local testing."),
         new("WhatsApp:GraphApiVersion", "WhatsApp", "Graph API version", SettingKind.Text,
             "For example v23.0. Use the version shown in the curl example on Meta's API Setup page."),
+        new("WhatsApp:AppId", "WhatsApp", "App ID (Embedded Signup)", SettingKind.Text,
+            "App settings > Basic > App ID. Needed for the \"Connect WhatsApp\" button on a restaurant's page (Tech Provider / coexistence)."),
+        new("WhatsApp:EmbeddedSignupConfigId", "WhatsApp", "Embedded Signup configuration ID", SettingKind.Text,
+            "Meta app > Facebook Login for Business > Configurations > your WhatsApp Embedded Signup configuration > Configuration ID."),
 
         new("Anthropic:ApiKey", "AI (Claude)", "Anthropic API key", SettingKind.Secret,
             "console.anthropic.com > API Keys. If empty, the ANTHROPIC_API_KEY env var is used."),

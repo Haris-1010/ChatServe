@@ -519,6 +519,38 @@ namespace ChatServe.Api.Data.Migrations
                     b.ToTable("Organizations");
                 });
 
+            modelBuilder.Entity("ChatServe.Api.Data.PhoneContact", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("RestaurantId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RestaurantId", "Phone")
+                        .IsUnique();
+
+                    b.ToTable("PhoneContacts");
+                });
+
             modelBuilder.Entity("ChatServe.Api.Data.ReplyRequest", b =>
                 {
                     b.Property<int>("Id")
@@ -602,8 +634,17 @@ namespace ChatServe.Api.Data.Migrations
                     b.Property<string>("ExtraInfo")
                         .HasColumnType("text");
 
+                    b.Property<int>("HistoryMessagesImported")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("HistorySyncRequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsBotEnabled")
                         .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("LastPhoneReplyAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal?>("MinimumOrder")
                         .HasPrecision(10, 2)
@@ -617,6 +658,9 @@ namespace ChatServe.Api.Data.Migrations
                     b.Property<int>("OrganizationId")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("PauseBotOnPhoneReply")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("PaymentMethods")
                         .HasColumnType("text");
 
@@ -629,6 +673,22 @@ namespace ChatServe.Api.Data.Migrations
 
                     b.Property<string>("TrainingExamples")
                         .HasColumnType("text");
+
+                    b.Property<string>("WhatsAppAccessToken")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("WhatsAppBusinessAccountId")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset?>("WhatsAppConnectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("WhatsAppMode")
+                        .IsRequired()
+                        .HasMaxLength(15)
+                        .HasColumnType("character varying(15)");
 
                     b.Property<string>("WhatsAppPhoneNumberId")
                         .IsRequired()
@@ -812,6 +872,15 @@ namespace ChatServe.Api.Data.Migrations
                     b.HasOne("ChatServe.Api.Data.Order", null)
                         .WithMany("Items")
                         .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ChatServe.Api.Data.PhoneContact", b =>
+                {
+                    b.HasOne("ChatServe.Api.Data.Restaurant", null)
+                        .WithMany()
+                        .HasForeignKey("RestaurantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

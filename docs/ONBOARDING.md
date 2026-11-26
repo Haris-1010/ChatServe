@@ -47,6 +47,10 @@ Already done: Railway deploy, webhook `https://chatserve.up.railway.app/webhook`
 - [ ] Their **package** (AI replies per month, e.g. 3,000) and your fee (Part 5)
 
 ### Step 2: Add the number in Meta (about 10 minutes)
+
+> **Client wants to keep using the number in the WhatsApp Business app?** Use coexistence instead of the steps below:
+> Restaurant info > WhatsApp connection > **📱 Connect WhatsApp Business app number**. Needs Tech Provider status. See `docs/COEXISTENCE.md`.
+
 1. developers.facebook.com → ChatServe app → **Use cases → Customize → Step 2. Production setup**
 2. **Register your WhatsApp phone number → Add phone number**
 3. WhatsApp Business account: **first time "Create new WhatsApp Business account"** (not the "Test" one); later clients: the same account
