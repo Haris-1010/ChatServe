@@ -35,7 +35,12 @@ public sealed record InteractiveMessage(
         sb.Append(body);
         sb.AppendLine().AppendLine();
         for (var i = 0; i < Options.Count; i++)
-            sb.Append(i + 1).Append(". ").AppendLine(Options[i].Title);
+        {
+            sb.Append(i + 1).Append(". ").Append(Options[i].Title);
+            if (IsList && !string.IsNullOrWhiteSpace(Options[i].Description)) sb.Append(" (").Append(Options[i].Description).Append(')');
+            sb.AppendLine();
+        }
+        if (!string.IsNullOrWhiteSpace(Footer)) sb.AppendLine().Append('_').Append(Footer).AppendLine("_");
         return sb.ToString().TrimEnd();
     }
 }

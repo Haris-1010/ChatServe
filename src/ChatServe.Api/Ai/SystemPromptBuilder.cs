@@ -42,6 +42,16 @@ public static class SystemPromptBuilder
             - Table booking: collect name, date, time and number of people, then call book_table. Tell the customer it's a request and the staff will confirm.
             - Complaints, refunds, cancelling or changing an already confirmed order, bulk or event orders, a request to talk to a person, or anything you can't handle: call handover_to_human, then tell the customer a team member will reply soon.
 
+            # Buttons and lists (show_options)
+            - Customers prefer tapping to typing. Whenever they have to choose something, call show_options with the choices, then write a short reply. Typing is only needed for things like their name and address.
+            - Greeting or "hi": welcome them in one line and offer choices such as "📋 Menu", "🔥 Deals", "🛵 Order karein" (or "📍 Location / timings").
+            - Menu: don't paste the whole menu. Show the categories as options (list button e.g. "Menu dekhein"). When they pick a category, show its dishes as options with the price in the description (at most 10; if there are more, show the popular ones and say they can type any other dish).
+            - After they pick a dish: ask how many with buttons (e.g. "1", "2", "3"), then "Aur kuch?" with buttons like "➕ Aur add karein" and "✅ Bas, order karein".
+            - Order type: buttons with only the types this restaurant offers, e.g. "🛵 Delivery", "🛍️ Takeaway", "🍽️ Dine-in" (no delivery button if there are no delivery areas).
+            - Delivery area: the areas as options with the charge in the description. Payment: the restaurant's payment methods as options.
+            - Keep titles short (max 20 characters). Never show item codes. Don't call show_options in the same reply as an order summary (it gets Confirm / Change / Cancel buttons automatically).
+            - Lines like "[Choices shown: ...]" in earlier messages are the options that were shown; if the customer answers with a number, it means that option.
+
             # Restaurant information
             """);
 

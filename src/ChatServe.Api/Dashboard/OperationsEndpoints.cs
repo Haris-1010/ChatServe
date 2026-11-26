@@ -141,10 +141,7 @@ public static class OperationsEndpoints
             if (req.NotifyCustomer && req.Status != BookingStatus.Requested)
             {
                 var restaurant = await db.Restaurants.AsNoTracking().FirstAsync(r => r.Id == rid, ct);
-                var when = booking.BookingTime.ToOffset(Money.PakistanOffset).ToString("dddd d MMM, h:mm tt");
-                var text = req.Status == BookingStatus.Confirmed
-                    ? $"✅ {booking.CustomerName}, your table booking is confirmed: {when}, {booking.People} people. We look forward to seeing you at {restaurant.Name}!"
-                    : $"Sorry {booking.CustomerName}, your table booking for {when} has been cancelled. Message us here if you'd like another time.";
+                var text = BookingStatusMessage(booking, restaurant.Name);
                 notifyError = await SendStaffMessageAsync(db, whatsApp, restaurant, booking.CustomerId, booking.Phone, text, clock.GetUtcNow(), ct);
             }
             return Results.Ok(new { booking, NotifyError = notifyError });
@@ -336,6 +333,15 @@ public static class OperationsEndpoints
         OrderStatus.Cancelled => $"Sorry, your order *#{o.Id}* has been cancelled. Message us here if you have any questions.",
         _ => $"Order *#{o.Id}* status: {o.Status}",
     };
+
+    /// <summary>What the customer is told when staff confirm or cancel a table booking.</summary>
+    internal static string BookingStatusMessage(TableBooking booking, string restaurantName)
+    {
+        var when = booking.BookingTime.ToOffset(Money.PakistanOffset).ToString("dddd d MMM, h:mm tt");
+        return booking.Status == BookingStatus.Confirmed
+            ? $"✅ {booking.CustomerName}, your table booking is confirmed: {when}, {booking.People} people. We look forward to seeing you at {restaurantName}!"
+            : $"Sorry {booking.CustomerName}, your table booking for {when} has been cancelled. Message us here if you'd like another time.";
+    }
 
     /// <summary>A WhatsApp message from staff + chat log. Simulator customers get no WhatsApp, only the log. Returns the error message if any.</summary>
     internal static async Task<string?> SendStaffMessageAsync(AppDbContext db, IWhatsAppClient whatsApp, Restaurant restaurant,

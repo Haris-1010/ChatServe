@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ChatServe.Api.Ai;
 using ChatServe.Api.Data;
+using ChatServe.Api.WhatsApp;
 
 namespace ChatServe.Api.Orders;
 
@@ -16,6 +17,10 @@ public static class RestaurantTools
     public const string GetOrderStatus = "get_order_status";
     public const string BookTable = "book_table";
     public const string HandoverToHuman = "handover_to_human";
+    public const string ShowOptions = "show_options";
+
+    /// <summary>Ids of the choices the AI puts under its reply: "opt:1", "opt:2"... The tap comes back as the option's title.</summary>
+    public const string OptionIdPrefix = "opt:";
 
     public const string NoArea = "none";
 
@@ -85,6 +90,33 @@ public static class RestaurantTools
             additionalProperties = false,
         };
 
+        var showOptions = new
+        {
+            type = "object",
+            properties = new Dictionary<string, object>
+            {
+                ["options"] = new
+                {
+                    type = "array",
+                    description = "1 to 10 choices in the order to show them.",
+                    items = new
+                    {
+                        type = "object",
+                        properties = new Dictionary<string, object>
+                        {
+                            ["title"] = new { type = "string", description = "What the customer taps. Max 20 characters; an emoji in front is nice (e.g. \"🛵 Delivery\")." },
+                            ["description"] = new { type = "string", description = "Small grey line under the title in a list, e.g. the price \"Rs 500\" or \"Rs 200 delivery\". Empty string if not needed. Max 70 characters." },
+                        },
+                        required = new[] { "title", "description" },
+                        additionalProperties = false,
+                    },
+                },
+                ["list_button"] = new { type = "string", description = "Only for 4 or more options: the text on the button that opens the list (max 20), e.g. \"Menu dekhein\". Empty string otherwise." },
+            },
+            required = new[] { "options", "list_button" },
+            additionalProperties = false,
+        };
+
         return
         [
             new AiTool(PlaceOrder,
@@ -102,6 +134,11 @@ public static class RestaurantTools
                 "Hand the chat to a staff member: complaints, refunds, cancelling or changing an already confirmed order, bulk/event orders, " +
                 "the customer asks for a human, or anything you can't handle. The bot stops replying to this customer after this.",
                 Json(handover)),
+            new AiTool(ShowOptions,
+                "Show tappable choices under your reply (WhatsApp buttons for up to 3 short options, a list for 4 to 10). Use it whenever the " +
+                "customer has to pick something: a menu category, a dish, quantity, delivery/takeaway/dine-in, delivery area, payment method, " +
+                "yes/no. The customer's tap comes back to you as the option's title. Call it once, then write your reply text.",
+                Json(showOptions)),
         ];
     }
 
@@ -117,7 +154,10 @@ public sealed class OrderToolExecutor(
 {
     public Order? Draft { get; private set; }
     public bool HandedOver { get; private set; }
-    public List<string> StaffAlerts { get; } = [];
+
+    /// <summary>Choices the AI asked to show under its reply (show_options), or null.</summary>
+    public InteractiveMessage? Options { get; private set; }
+    public List<StaffAlert> StaffAlerts { get; } = [];
 
     public async Task<ToolOutcome> ExecuteAsync(string name, IReadOnlyDictionary<string, JsonElement> input, CancellationToken ct)
     {
@@ -176,7 +216,7 @@ public sealed class OrderToolExecutor(
                 if (result.Value is null)
                     return new ToolOutcome(result.Error!, IsError: true);
 
-                StaffAlerts.Add(OrderFormatter.BookingTicket(result.Value));
+                StaffAlerts.Add(new StaffAlert(OrderFormatter.BookingTicket(result.Value), StaffButtons.ForBooking(result.Value)));
                 return new ToolOutcome(
                     $"Booking request #{result.Value.Id} saved for {result.Value.BookingTime:dddd d MMMM, h:mm tt}, {result.Value.People} people. " +
                     "Tell the customer the request is received and the staff will confirm it shortly. It is not confirmed yet.");
@@ -190,6 +230,33 @@ public sealed class OrderToolExecutor(
                 StaffAlerts.Add(OrderFormatter.HandoverTicket(customer, string.IsNullOrWhiteSpace(reason) ? "(not given)" : reason));
                 return new ToolOutcome(
                     "Staff has been notified and will continue this chat. Tell the customer briefly that a team member will reply soon. Don't ask further questions.");
+            }
+
+            case RestaurantTools.ShowOptions:
+            {
+                var options = input.TryGetValue("options", out var arr) && arr.ValueKind == JsonValueKind.Array
+                    ? arr.EnumerateArray()
+                        .Select(o => (Title: (o.TryGetProperty("title", out var t) ? t.GetString() : null)?.Trim() ?? "",
+                                      Description: (o.TryGetProperty("description", out var d) ? d.GetString() : null)?.Trim()))
+                        .Where(o => o.Title.Length > 0)
+                        .DistinctBy(o => o.Title, StringComparer.OrdinalIgnoreCase)
+                        .ToList()
+                    : [];
+                if (options.Count == 0)
+                    return new ToolOutcome("Give at least one option with a title.", IsError: true);
+                if (options.Count > InteractiveMessage.MaxRows)
+                    return new ToolOutcome($"At most {InteractiveMessage.MaxRows} options fit. Show the most useful {InteractiveMessage.MaxRows} and say they can type any other dish.", IsError: true);
+
+                var asButtons = options.Count <= InteractiveMessage.MaxButtons && options.All(o => o.Title.Length <= 20) &&
+                                options.All(o => string.IsNullOrEmpty(o.Description));
+                var listButton = Str(input, "list_button").Trim();
+                Options = new InteractiveMessage(
+                    options.Select((o, i) => new ReplyOption(RestaurantTools.OptionIdPrefix + (i + 1), o.Title,
+                        string.IsNullOrEmpty(o.Description) ? null : o.Description)).ToList(),
+                    ListButton: asButtons ? null : listButton.Length > 0 ? listButton : romanUrdu ? "Options dekhein" : "See options");
+                return new ToolOutcome(
+                    "Done: these will show as tappable choices under your reply. Now write the reply text, short. " +
+                    "Don't repeat the options as a numbered list (the prices you put in descriptions are visible in the list).");
             }
 
             default:

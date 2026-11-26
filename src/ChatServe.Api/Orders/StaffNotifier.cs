@@ -7,7 +7,8 @@ namespace ChatServe.Api.Orders;
 public interface IStaffNotifier
 {
     /// <param name="exceptPhone">A staff number to skip (e.g. the one who sent the command).</param>
-    Task NotifyAsync(Restaurant restaurant, string text, CancellationToken ct, string? exceptPhone = null);
+    /// <param name="buttons">Buttons under the message (e.g. Prep / Rider gaya / Delivered on a new order).</param>
+    Task NotifyAsync(Restaurant restaurant, string text, CancellationToken ct, string? exceptPhone = null, InteractiveMessage? buttons = null);
 }
 
 /// <summary>
@@ -18,11 +19,11 @@ public interface IStaffNotifier
 /// </summary>
 public sealed class WhatsAppStaffNotifier(IWhatsAppClient whatsApp, SimulationContext simulation, ILogger<WhatsAppStaffNotifier> logger) : IStaffNotifier
 {
-    public async Task NotifyAsync(Restaurant restaurant, string text, CancellationToken ct, string? exceptPhone = null)
+    public async Task NotifyAsync(Restaurant restaurant, string text, CancellationToken ct, string? exceptPhone = null, InteractiveMessage? buttons = null)
     {
         if (simulation.IsActive)
         {
-            simulation.StaffAlerts.Add(text); // dashboard simulator: don't send real WhatsApp
+            simulation.StaffAlerts.Add(buttons is null ? text : buttons.AsPlainText(text)); // dashboard simulator: don't send real WhatsApp
             return;
         }
 
@@ -39,7 +40,10 @@ public sealed class WhatsAppStaffNotifier(IWhatsAppClient whatsApp, SimulationCo
                 continue;
             try
             {
-                await whatsApp.SendTextAsync(restaurant.WhatsAppPhoneNumberId, number, text, replyToMessageId: null, ct);
+                if (buttons is null)
+                    await whatsApp.SendTextAsync(restaurant.WhatsAppPhoneNumberId, number, text, replyToMessageId: null, ct);
+                else
+                    await whatsApp.SendInteractiveAsync(restaurant.WhatsAppPhoneNumberId, number, text, buttons, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -51,6 +55,12 @@ public sealed class WhatsAppStaffNotifier(IWhatsAppClient whatsApp, SimulationCo
 }
 
 /// <summary>For the dashboard's chat simulator (scoped). When active, staff alerts are collected here instead of going to WhatsApp.</summary>
+/// <summary>A message for the staff numbers, optionally with buttons.</summary>
+public sealed record StaffAlert(string Text, InteractiveMessage? Buttons = null)
+{
+    public static implicit operator StaffAlert(string text) => new(text);
+}
+
 public sealed class SimulationContext
 {
     public bool IsActive { get; set; }

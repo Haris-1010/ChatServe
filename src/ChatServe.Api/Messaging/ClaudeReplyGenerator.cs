@@ -91,8 +91,9 @@ public sealed class ClaudeReplyGenerator(
         AiResult? result = null;
         Order? newDraft = null;
         InteractiveMessage? interactive = null;
+        InteractiveMessage? aiOptions = null; // choices the AI put under its reply (show_options)
         FeedbackOutcome? fb = null;
-        var staffAlerts = new List<string>();
+        var staffAlerts = new List<StaffAlert>();
         var pending = string.IsNullOrWhiteSpace(text) ? null : await orders.GetPendingDraftAsync(customer.Id, now, ct);
         var lastBotId = await LastBotMessageIdAsync(customer.Id, ct);
 
@@ -106,7 +107,7 @@ public sealed class ClaudeReplyGenerator(
             // The customer confirmed: the order now goes to the kitchen. Fixed reply, no AI call.
             await orders.ConfirmAsync(pending, now, ct);
             reply = CustomerText.Confirmed(pending, restaurant.Currency, ru);
-            staffAlerts.Add(OrderFormatter.KitchenTicket(pending, restaurant.Currency));
+            staffAlerts.Add(new StaffAlert(OrderFormatter.KitchenTicket(pending, restaurant.Currency), StaffButtons.ForOrder(pending)));
             logger.LogInformation("Order {OrderId} confirmed for {Restaurant}, total {Total}", pending.Id, restaurant.Name, pending.Total);
         }
         else if (pending is not null && (message.ReplyId == CancelId || OrderFormatter.IsCancellation(text)))
@@ -120,12 +121,12 @@ public sealed class ClaudeReplyGenerator(
             // Delivery received / rating / short thanks: fixed replies, no AI call.
             reply = fb.Reply;
             interactive = fb.Buttons;
-            staffAlerts.AddRange(fb.StaffAlerts);
+            staffAlerts.AddRange(fb.StaffAlerts.Select(a => new StaffAlert(a)));
         }
         else
         {
             // A feedback comment was saved (fb.Reply null): the AI still answers it, in case it also asks for something.
-            if (fb is not null) staffAlerts.AddRange(fb.StaffAlerts);
+            if (fb is not null) staffAlerts.AddRange(fb.StaffAlerts.Select(a => new StaffAlert(a)));
             var tools = new OrderToolExecutor(orders, restaurant, customer, now, ru);
             var history = WithCurrentTime(await LoadHistoryAsync(customer.Id, ct), now, PendingNote(pending, restaurant.Currency));
             var failed = false;
@@ -159,7 +160,9 @@ public sealed class ClaudeReplyGenerator(
             }
 
             if (newDraft is not null && !tools.HandedOver)
-                interactive = DraftButtons(ru);
+                interactive = DraftButtons(ru); // the order summary always gets Confirm / Change / Cancel
+            else if (!failed && !tools.HandedOver && tools.Options is not null)
+                interactive = aiOptions = tools.Options;
         }
 
         var botMessage = new ChatMessage
@@ -167,7 +170,8 @@ public sealed class ClaudeReplyGenerator(
             RestaurantId = restaurant.Id,
             CustomerId = customer.Id,
             Role = ChatRole.Bot,
-            Text = reply,
+            // The AI's choices are kept in the saved text, so it still knows them when the customer types "2" or the title.
+            Text = aiOptions is null ? reply : reply + "\n\n[Choices shown: " + string.Join(" | ", aiOptions.Options.Select(o => o.Title)) + "]",
             CreatedAt = clock.GetUtcNow(),
             InputTokens = (int?)result?.InputTokens,
             OutputTokens = (int?)result?.OutputTokens,
@@ -193,7 +197,7 @@ public sealed class ClaudeReplyGenerator(
             buttons.Value = interactive;
 
         foreach (var alert in staffAlerts)
-            await staff.NotifyAsync(restaurant, alert, ct);
+            await staff.NotifyAsync(restaurant, alert.Text, ct, buttons: alert.Buttons);
 
         if (result is not null && usageAlerts is not null)
         {

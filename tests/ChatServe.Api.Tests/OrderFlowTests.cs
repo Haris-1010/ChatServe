@@ -294,7 +294,7 @@ public class OrderFlowTests
         Assert.Contains("Johar Town (Rs 100)", prompt);
 
         var tools = RestaurantTools.Build(r);
-        Assert.Equal(["place_order", "get_order_status", "book_table", "handover_to_human"], tools.Select(t => t.Name));
+        Assert.Equal(["place_order", "get_order_status", "book_table", "handover_to_human", "show_options"], tools.Select(t => t.Name));
         Assert.Contains("\"Johar Town\"", tools[0].JsonSchema);
         Assert.Contains("\"additionalProperties\":false", tools[0].JsonSchema);
         Assert.Equal(tools[0].JsonSchema, RestaurantTools.Build(r)[0].JsonSchema); // deterministic = cache hit
