@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using ChatServe.Api.Ai;
 using ChatServe.Api.Data;
+using ChatServe.Api.WhatsApp;
 using ChatServe.Api.Orders;
 
 namespace ChatServe.Api.Tests;
@@ -33,10 +34,12 @@ public sealed class FakeChatCompletionClient : IChatCompletionClient
 public sealed class FakeStaffNotifier : IStaffNotifier
 {
     public ConcurrentQueue<string> Alerts { get; } = new();
+    public ConcurrentQueue<(string Text, InteractiveMessage? Buttons)> WithButtons { get; } = new();
 
-    public Task NotifyAsync(Restaurant restaurant, string text, CancellationToken ct, string? exceptPhone = null)
+    public Task NotifyAsync(Restaurant restaurant, string text, CancellationToken ct, string? exceptPhone = null, InteractiveMessage? buttons = null)
     {
         Alerts.Enqueue(text);
+        WithButtons.Enqueue((text, buttons));
         return Task.CompletedTask;
     }
 }

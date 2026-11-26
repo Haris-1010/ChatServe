@@ -25,7 +25,7 @@ import { errorText, Toasts } from '../core/toast';
           <label class="field"><span>WhatsApp Phone number ID</span><input name="pnid" [(ngModel)]="r.whatsAppPhoneNumberId" [readonly]="!auth.isAdmin()" />
             <small>The ID from Meta > API Setup. It tells the app which restaurant a message belongs to.@if (!auth.isAdmin()) { Only the admin can change it. }</small></label>
           <label class="field"><span>Staff / kitchen WhatsApp numbers</span><input name="staff" [(ngModel)]="r.staffWhatsAppNumber" placeholder="923001234567, 923331234567" />
-            <small>One or more numbers, separated by commas (manager, kitchen, rider). Every number gets the order tickets and can reply "prep 12", "out 12", "done 12" or "orders" to run the orders from WhatsApp. Each number should send "start" to the business number once a day (24-hour window).</small></label>
+            <small>One or more numbers, separated by commas (manager, kitchen, rider). Every number gets the order tickets with buttons (👨‍🍳 Prep, 🛵 Rider gaya, ✅ Delivered) to run the orders from WhatsApp; typing "prep 12" or "orders" also works. Each number should send "start" to the business number once a day (24-hour window).</small></label>
           <label class="field"><span>Currency</span><input name="cur" [(ngModel)]="r.currency" /></label>
           <label class="field"><span>Address</span><input name="addr" [(ngModel)]="r.address" /></label>
           <label class="field"><span>Timings</span><input name="time" [(ngModel)]="r.timings" placeholder="Daily 12 PM to 2 AM" /></label>

@@ -70,7 +70,7 @@ Open the restaurant:
 ### Step 5: Test it yourself (about 10 minutes)
 1. **Test the bot:** ask for the menu, place an order, try an area you don't deliver to, try an address with two places ("Paragon City, Johar Town")
 2. From your own phone, message the **restaurant's real number**: order → reply "haan" → order confirmed
-3. Check the **ticket reaches every staff number**. From a staff phone send `prep N`, `out N`, `done N`: the customer gets a message at each step, and after `done` is asked "Kya aap ko order mil gaya?"
+3. Check the **ticket reaches every staff number** with its buttons. From a staff phone tap **👨‍🍳 Prep**, **🛵 Rider gaya**, **✅ Delivered**: the customer gets a message at each step, and after `done` is asked "Kya aap ko order mil gaya?"
 4. Send a voice note (if the OpenAI key is set)
 
 Tip: use **different phones** for "customer" and "staff". If one number is both, staff tickets show up in the customer chat.
@@ -84,7 +84,8 @@ Give the login (URL + username + password) **privately**. Show them:
 
 **Staff rules (important):**
 - Every staff number sends **`start`** to the restaurant's number **once a day** (Meta only delivers tickets to numbers that messaged in the last 24 hours)
-- Reply to a ticket with **`prep 12`** (being prepared), **`out 12`** (rider left), **`done 12`** (delivered / ready for pickup), **`cancel 12`**
+- Every new order arrives with buttons: tap **👨‍🍳 Prep** (being prepared), **🛵 Rider gaya** (rider left), **✅ Delivered / Ready** (delivered / ready for pickup), **❌ Cancel**. After each tap the next buttons come. Typing still works: `prep 12`, `out 12`, `done 12`, `cancel 12`
+- Table booking requests arrive with **✅ Confirm booking / ❌ Cancel booking** buttons; the customer is told automatically
 - **Always send `done` after delivery**: that's when the customer is asked whether they received the order
 - **`orders`** lists all active orders, **`help`** shows the commands
 

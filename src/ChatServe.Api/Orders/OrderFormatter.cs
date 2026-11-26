@@ -63,19 +63,14 @@ public static partial class OrderFormatter
         if (o.Type == OrderType.Delivery) sb.AppendLine($"Address: {o.DeliveryAddress} ({o.DeliveryArea})");
         if (!string.IsNullOrWhiteSpace(o.PaymentMethod)) sb.AppendLine($"Payment: {o.PaymentMethod}");
         if (!string.IsNullOrWhiteSpace(o.Notes)) sb.AppendLine($"Note: {o.Notes}");
-        sb.AppendLine();
-        sb.Append(o.Type == OrderType.Delivery
-            ? $"Reply: *prep {o.Id}* / *out {o.Id}* / *done {o.Id}*"
-            : $"Reply: *prep {o.Id}* / *done {o.Id}*");
-        return sb.ToString().TrimEnd();
+        return sb.ToString().TrimEnd(); // the next steps go out as buttons (StaffButtons.ForOrder)
     }
 
     public static string BookingTicket(TableBooking b) =>
         $"📅 *TABLE BOOKING REQUEST #{b.Id}*\n" +
         $"{b.BookingTime:dddd d MMM, h:mm tt}, {b.People} people\n" +
         $"Customer: {b.CustomerName}, +{b.Phone}" +
-        (string.IsNullOrWhiteSpace(b.Notes) ? "" : $"\nNote: {b.Notes}") +
-        "\nPlease confirm with the customer.";
+        (string.IsNullOrWhiteSpace(b.Notes) ? "" : $"\nNote: {b.Notes}");
 
     public static string HandoverTicket(Customer c, string reason) =>
         $"🙋 *Customer needs staff*\n{c.Name ?? "Customer"}, +{c.Phone}\nReason: {reason}\nThe bot is paused for this customer. Reply from the WhatsApp Business app or the dashboard.";
