@@ -23,7 +23,7 @@ public static partial class OrderFormatter
         sb.AppendLine(o.Type switch
         {
             OrderType.Delivery => $"Address: {o.DeliveryAddress}",
-            OrderType.Takeaway => "Takeaway (pick up from the restaurant)",
+            OrderType.Takeaway => "Pickup (you collect it from us)",
             _ => "Dine-in",
         });
         if (!string.IsNullOrWhiteSpace(o.PaymentMethod)) sb.AppendLine($"Payment: {o.PaymentMethod}");
@@ -45,7 +45,7 @@ public static partial class OrderFormatter
         };
         return $"✅ Thank you {o.CustomerName}! Your order *#{o.Id}* is confirmed.\n" +
                $"Total: *{TotalText(o, currency)}*" + (string.IsNullOrWhiteSpace(o.PaymentMethod) ? "" : $" ({o.PaymentMethod})") + "\n" +
-               $"Your order has been sent to the kitchen. {next}";
+               $"Our team is preparing it now. {next}";
     }
 
     public const string DraftCancelledReply = "OK, your order has been cancelled. Let us know if you need anything else. 🙂";
@@ -67,7 +67,7 @@ public static partial class OrderFormatter
     }
 
     public static string BookingTicket(TableBooking b) =>
-        $"📅 *TABLE BOOKING REQUEST #{b.Id}*\n" +
+        $"📅 *BOOKING REQUEST #{b.Id}*\n" +
         $"{b.BookingTime:dddd d MMM, h:mm tt}, {b.People} people\n" +
         $"Customer: {b.CustomerName}, +{b.Phone}" +
         (string.IsNullOrWhiteSpace(b.Notes) ? "" : $"\nNote: {b.Notes}");
@@ -77,7 +77,7 @@ public static partial class OrderFormatter
 
     public static string StatusText(OrderStatus s) => s switch
     {
-        OrderStatus.Confirmed => "confirmed, sent to kitchen",
+        OrderStatus.Confirmed => "confirmed",
         OrderStatus.Preparing => "being prepared",
         OrderStatus.OutForDelivery => "out for delivery (rider on the way)",
         OrderStatus.Completed => "completed/delivered",

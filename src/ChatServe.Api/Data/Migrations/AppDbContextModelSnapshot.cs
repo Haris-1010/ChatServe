@@ -617,8 +617,17 @@ namespace ChatServe.Api.Data.Migrations
                     b.Property<string>("Address")
                         .HasColumnType("text");
 
+                    b.Property<string>("BotInstructions")
+                        .HasColumnType("text");
+
                     b.Property<string>("BotTone")
                         .HasColumnType("text");
+
+                    b.Property<string>("BusinessDescription")
+                        .HasColumnType("text");
+
+                    b.Property<int>("BusinessType")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -668,10 +677,19 @@ namespace ChatServe.Api.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<bool>("TakesBookings")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("TakesOrders")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Timings")
                         .HasColumnType("text");
 
                     b.Property<string>("TrainingExamples")
+                        .HasColumnType("text");
+
+                    b.Property<string>("WelcomeMessage")
                         .HasColumnType("text");
 
                     b.Property<string>("WhatsAppAccessToken")

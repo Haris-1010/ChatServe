@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api, Deal, Faq, MenuItem, money, Zone } from '../core/api';
+import { Api, CurrentRestaurant, Deal, Faq, MenuItem, money, Zone } from '../core/api';
 import { onRestaurant } from '../core/page';
 import { errorText, Toasts } from '../core/toast';
 
@@ -10,11 +10,11 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
   selector: 'app-menu',
   imports: [FormsModule],
   template: `
-    <div class="page-head"><h1>Menu, deals, FAQs</h1></div>
+    <div class="page-head"><h1>{{ t.items }}, deals, FAQs</h1></div>
     <p class="muted">The bot only answers from what is written here. Changes apply from the next customer message.</p>
 
     <div class="tabs">
-      <button [class.active]="tab() === 'menu'" (click)="tab.set('menu')">🍛 Menu ({{ menu().length }})</button>
+      <button [class.active]="tab() === 'menu'" (click)="tab.set('menu')">{{ t.icon }} {{ t.items }} ({{ menu().length }})</button>
       <button [class.active]="tab() === 'deals'" (click)="tab.set('deals')">🎁 Deals ({{ deals().length }})</button>
       <button [class.active]="tab() === 'faqs'" (click)="tab.set('faqs')">❓ FAQs ({{ faqs().length }})</button>
       <button [class.active]="tab() === 'zones'" (click)="tab.set('zones')">🛵 Delivery areas ({{ zones().length }})</button>
@@ -23,10 +23,10 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
     @switch (tab()) {
       @case ('menu') {
         <section class="card">
-          <h2>New dish</h2>
+          <h2>New {{ t.item.toLowerCase() }}</h2>
           <form class="form-row" (ngSubmit)="add('menu', newItem)">
-            <label class="field"><span>Category</span><input name="cat" [(ngModel)]="newItem.category" list="cats" placeholder="Karahi" /></label>
-            <label class="field grow"><span>Name</span><input name="name" [(ngModel)]="newItem.name" placeholder="Chicken Karahi (Half)" /></label>
+            <label class="field"><span>Category</span><input name="cat" [(ngModel)]="newItem.category" list="cats" [placeholder]="ex.category" /></label>
+            <label class="field grow"><span>Name</span><input name="name" [(ngModel)]="newItem.name" [placeholder]="ex.name" /></label>
             <label class="field grow"><span>Description (optional)</span><input name="desc" [(ngModel)]="newItem.description" /></label>
             <label class="field w-sm"><span>Price</span><input name="price" type="number" min="0" [(ngModel)]="newItem.price" /></label>
             <button class="btn primary">+ Add</button>
@@ -38,7 +38,7 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
           <section class="card flush">
             <h2 class="pad">{{ cat }}</h2>
             <table class="table">
-              <thead><tr><th>Dish</th><th class="hide-sm">Description</th><th class="num">Price</th><th>Available</th><th></th></tr></thead>
+              <thead><tr><th>{{ t.item }}</th><th class="hide-sm">Description</th><th class="num">Price</th><th>Available</th><th></th></tr></thead>
               <tbody>
                 @for (m of byCategory(cat); track m.id) {
                   @if (editing() === 'menu-' + m.id) {
@@ -62,7 +62,7 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
               </tbody>
             </table>
           </section>
-        } @empty { <div class="card empty muted">The menu is empty. Add your first dish above.</div> }
+        } @empty { <div class="card empty muted">Nothing here yet. Add your first {{ t.item.toLowerCase() }} above.</div> }
       }
 
       @case ('deals') {
@@ -70,7 +70,7 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
           <h2>New deal</h2>
           <form class="form-row" (ngSubmit)="add('deals', newDeal)">
             <label class="field"><span>Name</span><input name="n" [(ngModel)]="newDeal.name" placeholder="Family Deal" /></label>
-            <label class="field grow"><span>What's included</span><input name="d" [(ngModel)]="newDeal.details" placeholder="Karahi Full + 4 Naan + 1.5L Drink" /></label>
+            <label class="field grow"><span>What's included</span><input name="d" [(ngModel)]="newDeal.details" [placeholder]="ex.deal" /></label>
             <label class="field w-sm"><span>Price</span><input name="p" type="number" min="0" [(ngModel)]="newDeal.price" /></label>
             <button class="btn primary">+ Add</button>
           </form>
@@ -104,7 +104,7 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
         <section class="card">
           <h2>New question / answer</h2>
           <form class="form-col" (ngSubmit)="add('faqs', newFaq)">
-            <label class="field"><span>Question</span><input name="q" [(ngModel)]="newFaq.question" placeholder="Is the food halal?" /></label>
+            <label class="field"><span>Question</span><input name="q" [(ngModel)]="newFaq.question" [placeholder]="ex.faq" /></label>
             <label class="field"><span>Answer</span><textarea name="a" rows="2" [(ngModel)]="newFaq.answer"></textarea></label>
             <div><button class="btn primary">+ Add</button></div>
           </form>
@@ -163,6 +163,17 @@ type Kind = 'menu' | 'deals' | 'faqs' | 'zones';
 export class MenuPage {
   private api = inject(Api);
   private toasts = inject(Toasts);
+  private restaurants = inject(CurrentRestaurant);
+  protected get t() { return this.restaurants.terms; }
+  /** Example placeholders that fit the kind of business. */
+  protected get ex() {
+    switch (this.restaurants.current?.businessType) {
+      case 'Shop': return { category: 'Lawn suits', name: '3-piece printed lawn', deal: '2 suits + free dupatta', faq: 'Do you have cash on delivery?' };
+      case 'Services': return { category: 'Hair', name: 'Haircut + blow dry', deal: 'Bridal package', faq: 'Do I need an appointment?' };
+      case 'Other': return { category: 'Category', name: 'Item name', deal: 'What the deal includes', faq: 'A common question' };
+      default: return { category: 'Karahi', name: 'Chicken Karahi (Half)', deal: 'Karahi Full + 4 Naan + 1.5L Drink', faq: 'Is the food halal?' };
+    }
+  }
   tab = signal<Kind>('menu');
   menu = signal<MenuItem[]>([]);
   deals = signal<Deal[]>([]);

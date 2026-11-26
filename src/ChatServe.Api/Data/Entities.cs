@@ -35,6 +35,17 @@ public sealed class Organization
     public List<Restaurant> Restaurants { get; set; } = [];
 }
 
+/// <summary>The kind of business. Stored as a number: only add new values at the end.</summary>
+public enum BusinessType
+{
+    Restaurant = 0,
+    /// <summary>Shop / online store: products, delivery or shipping.</summary>
+    Shop = 1,
+    /// <summary>Salon, clinic, gym, consultant...: services and appointments.</summary>
+    Services = 2,
+    Other = 3,
+}
+
 public enum ReplyRequestKind
 {
     /// <summary>Extra replies for the current month only.</summary>
@@ -91,6 +102,26 @@ public sealed class Restaurant
     /// the restaurant's way of talking. Phone numbers are masked before saving. Goes into the system prompt.
     /// </summary>
     public string? TrainingExamples { get; set; }
+
+    // ---- Bot setup from the portal (no code changes needed per client) ----
+
+    /// <summary>What kind of business this is. Changes the bot's words (menu vs products vs services) and its default flow.</summary>
+    public BusinessType BusinessType { get; set; } = BusinessType.Restaurant;
+
+    /// <summary>One or two lines about the business, e.g. "Ladies clothing brand, Lahore, ships all over Pakistan".</summary>
+    public string? BusinessDescription { get; set; }
+
+    /// <summary>The owner's own rules for the bot, one per line (e.g. "Always offer the family deal"). Followed before the default style.</summary>
+    public string? BotInstructions { get; set; }
+
+    /// <summary>How the bot greets a new customer. The bot adapts it to the customer's language.</summary>
+    public string? WelcomeMessage { get; set; }
+
+    /// <summary>false = the bot never takes orders (info only, or orders handled by staff).</summary>
+    public bool TakesOrders { get; set; } = true;
+
+    /// <summary>false = no table booking / appointment requests.</summary>
+    public bool TakesBookings { get; set; } = true;
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 

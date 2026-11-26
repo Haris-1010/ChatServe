@@ -19,13 +19,13 @@ function newPhone() { return '000' + Math.floor(100000000 + Math.random() * 8999
     </div>
     <p class="muted">Chat with the bot as a customer, just like on WhatsApp. No real WhatsApp needed:
       replies, orders and bookings are saved to the real database (they show with a "Test" tag on the Orders and Chats pages).
-      Messages that would go to the kitchen show here in a yellow card. The AI needs an Anthropic key in Settings.</p>
+      Messages that would go to your staff show here in a yellow card. The AI needs an Anthropic key in Settings.</p>
 
     <div class="sim-wrap">
       <div class="phone">
         <div class="phone-head">
-          <div class="avatar">🍛</div>
-          <div><b>{{ restaurants.current?.name ?? 'Restaurant' }}</b><div class="small">{{ busy() ? 'typing…' : 'online' }}</div></div>
+          <div class="avatar">{{ restaurants.terms.icon }}</div>
+          <div><b>{{ restaurants.current?.name ?? 'Business' }}</b><div class="small">{{ busy() ? 'typing…' : 'online' }}</div></div>
         </div>
         <div class="phone-body" #scroller>
           @for (l of lines(); track $index) {
@@ -37,7 +37,17 @@ function newPhone() { return '000' + Math.floor(100000000 + Math.random() * 8999
                   @if (l.buttons?.header) { <div class="wa-header">{{ l.buttons!.header }}</div> }
                   <div class="text">{{ l.text }}</div>
                   @if (l.buttons?.footer) { <div class="wa-footer">{{ l.buttons!.footer }}</div> }
-                  @if (l.meta) { <div class="meta">{{ l.meta }}</div> }
+                  @if (l.meta) { <div class="meta">{{ l.meta }}@if (l.from === 'bot') { · <a class="fix" (click)="startCorrect($index)">✏️ Correct</a> }</div> }
+                  @if (correcting() === $index) {
+                    <div class="correct">
+                      <div class="small"><b>What should the bot have said?</b></div>
+                      <textarea rows="3" [(ngModel)]="better" name="better" placeholder="Write the reply you want"></textarea>
+                      <div class="row">
+                        <button class="btn primary small" (click)="saveCorrect($index)" [disabled]="busy() || !better.trim()">Teach the bot</button>
+                        <button class="btn ghost small" (click)="correcting.set(null)">Cancel</button>
+                      </div>
+                    </div>
+                  }
                   @if (l.buttons; as b) {
                     @if (b.listButton) {
                       <button class="wa-btn" (click)="openList.set(openList() === $index ? null : $index)" [disabled]="busy()">☰ {{ b.listButton }}</button>
@@ -60,7 +70,7 @@ function newPhone() { return '000' + Math.floor(100000000 + Math.random() * 8999
               </div>
             }
           } @empty {
-            <div class="sys">Type something to start, for example: "How much is the karahi?" or "Do you deliver to DHA?"</div>
+            <div class="sys">Type something to start, for example "Hi" or one of the quick questions.</div>
           }
         </div>
         <form class="phone-input" (ngSubmit)="send()">
@@ -77,10 +87,16 @@ function newPhone() { return '000' + Math.floor(100000000 + Math.random() * 8999
         <div class="chips">
           @for (q of quick; track q) { <button class="chip" (click)="send(q)" [disabled]="busy()">{{ q }}</button> }
         </div>
-        <p class="small muted">If a reply looks wrong, fix the <a routerLink="/menu">Menu/FAQs</a> or <a routerLink="/restaurant">Restaurant info</a>. The bot uses the new data from the next message.</p>
+        <p class="small muted">If a reply looks wrong, press <b>✏️ Correct</b> under it and write what it should have said, or fix <a routerLink="/menu">{{ restaurants.terms.items }}/FAQs</a> or <a routerLink="/restaurant">Business info</a>. The bot uses the new data from the next message.</p>
       </aside>
     </div>
   `,
+  styles: [`
+    .fix { cursor: pointer; text-decoration: underline; }
+    .correct { margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,.2); display: flex; flex-direction: column; gap: 6px; }
+    .correct textarea { width: 100%; box-sizing: border-box; font: inherit; }
+    .correct .row { display: flex; gap: 6px; }
+  `],
 })
 export class SimulatorPage {
   private api = inject(Api);
@@ -93,8 +109,41 @@ export class SimulatorPage {
   phone = signal(this.loadPhone());
   name = 'Test Customer';
   text = '';
-  quick = ['Send me the menu', 'How much is the karahi?', 'Do you deliver to DHA?', "What's in the family deal?",
-    '1 full chicken karahi and 4 naan, Johar Town', 'confirm', 'Book a table for 4 tomorrow at 9 pm', 'Where is my order?', 'Order mil gaya'];
+  correcting = signal<number | null>(null);
+  better = '';
+  get quick() {
+    switch (this.restaurants.current?.businessType) {
+      case 'Shop': return ['Hi', 'What products do you have?', 'Do you deliver to Karachi?', 'Is cash on delivery available?', 'I want to order', 'confirm', 'Where is my order?'];
+      case 'Services': return ['Hi', 'What services do you offer?', 'How much is a haircut?', 'Book an appointment tomorrow at 5 pm', 'Where are you located?'];
+      case 'Other': return ['Hi', 'What do you offer?', 'What are your prices?', 'Where are you located?', 'I want to talk to someone'];
+      default: return ['Hi', 'Send me the menu', 'How much is the karahi?', 'Do you deliver to DHA?', "What's in the family deal?",
+        '1 full chicken karahi and 4 naan, Johar Town', 'confirm', 'Book a table for 4 tomorrow at 9 pm', 'Where is my order?', 'Order mil gaya'];
+    }
+  }
+
+  startCorrect(i: number) {
+    this.better = '';
+    this.correcting.set(i);
+  }
+
+  /** "It should have said...": saved as a bot rule, used from the next message. */
+  async saveCorrect(i: number) {
+    const rid = this.rid();
+    const all = this.lines();
+    const bot = all[i];
+    if (!rid || !bot) return;
+    const asked = [...all.slice(0, i)].reverse().find(l => l.from === 'me')?.text ?? null;
+    this.busy.set(true);
+    try {
+      await this.api.correctBot(rid, asked, bot.text, this.better.trim());
+      this.correcting.set(null);
+      this.push({ from: 'system', text: '✅ Learned. The bot will reply like this from the next message (see Bot training > Bot rules).' });
+    } catch (e) {
+      this.toasts.error(errorText(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
   private rid = computed(() => this.restaurants.id());
 
   private loadPhone() {

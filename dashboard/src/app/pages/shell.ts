@@ -32,7 +32,7 @@ import { errorText, Toasts } from '../core/toast';
 
         @if (restaurants.list().length > 1) {
           <label class="field compact">
-            <span>{{ auth.isAdmin() ? 'Restaurant you are viewing' : 'Branch' }}</span>
+            <span>{{ auth.isAdmin() ? 'Business you are viewing' : 'Branch' }}</span>
             <select [ngModel]="restaurants.id()" (ngModelChange)="restaurants.select(+$event)">
               @if (auth.isAdmin()) {
                 @for (g of restaurants.groups(); track g.name) {
@@ -57,12 +57,12 @@ import { errorText, Toasts } from '../core/toast';
           <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"><span>📊</span> Home</a>
           <a routerLink="/orders" routerLinkActive="active"><span>🧾</span> Orders</a>
           <a routerLink="/chats" routerLinkActive="active"><span>💬</span> Chats</a>
-          <a routerLink="/bookings" routerLinkActive="active"><span>📅</span> Bookings</a>
+          @if (restaurants.current.takesBookings) { <a routerLink="/bookings" routerLinkActive="active"><span>📅</span> {{ restaurants.terms.bookings }}</a> }
           <a routerLink="/customers" routerLinkActive="active"><span>👥</span> Customers</a>
           <a routerLink="/feedback" routerLinkActive="active"><span>⭐</span> Feedback</a>
           <div class="nav-label">Bot setup</div>
-          <a routerLink="/menu" routerLinkActive="active"><span>🍛</span> Menu &amp; FAQs</a>
-          <a routerLink="/restaurant" routerLinkActive="active"><span>🏪</span> Restaurant info</a>
+          <a routerLink="/menu" routerLinkActive="active"><span>{{ restaurants.terms.icon }}</span> {{ restaurants.terms.items }} &amp; FAQs</a>
+          <a routerLink="/restaurant" routerLinkActive="active"><span>🏪</span> Business info</a>
           <a routerLink="/training" routerLinkActive="active"><span>🎓</span> Bot training</a>
           <a routerLink="/simulator" routerLinkActive="active"><span>🧪</span> Test the bot</a>
           @if (!auth.isAdmin()) {
@@ -107,8 +107,8 @@ import { errorText, Toasts } from '../core/toast';
           @if (loaded()) {
             @if (restaurants.list().length === 0 && auth.isAdmin() && !onAdminPage()) {
               <div class="card empty">
-                <h2>No restaurant yet</h2>
-                <p class="muted">Go to <a routerLink="/clients">All clients</a> and click <b>+ New client</b> to add the first restaurant.</p>
+                <h2>No business yet</h2>
+                <p class="muted">Go to <a routerLink="/clients">All clients</a> and click <b>+ New client</b> to add the first business.</p>
               </div>
             }
             <router-outlet />

@@ -24,6 +24,7 @@ public static class RestaurantEndpoints
                           {
                               r.Id, r.Name, r.WhatsAppPhoneNumberId, r.IsBotEnabled,
                               r.OrganizationId, OrganizationName = o.Name,
+                              r.BusinessType, r.TakesOrders, r.TakesBookings,
                           })
                 .ToListAsync(ct);
         });
@@ -89,6 +90,11 @@ public static class RestaurantEndpoints
             r.ExtraInfo = Clean(input.ExtraInfo);
             r.Currency = string.IsNullOrWhiteSpace(input.Currency) ? "Rs" : input.Currency.Trim();
             r.StaffWhatsAppNumber = staff;
+            // Older dashboards don't send these: keep what is saved.
+            if (input.BusinessType is { } bt && Enum.IsDefined(bt)) r.BusinessType = bt;
+            if (input.BusinessDescription is not null) r.BusinessDescription = Clean(input.BusinessDescription);
+            if (input.TakesOrders is { } to) r.TakesOrders = to;
+            if (input.TakesBookings is { } tb) r.TakesBookings = tb;
             await db.SaveChangesAsync(ct);
             return Results.Ok(ToProfile(r));
         });
@@ -109,6 +115,43 @@ public static class RestaurantEndpoints
             r.TrainingExamples = text;
             await db.SaveChangesAsync(ct);
             return Results.Ok(new TrainingDto(text, TrainingText.MaxLength));
+        });
+
+        // ---- Bot rules (the owner's own instructions + welcome message) ----
+        one.MapGet("/bot-rules", async (int rid, AppDbContext db, CancellationToken ct) =>
+            await db.Restaurants.AsNoTracking().Where(r => r.Id == rid)
+                .Select(r => new BotRulesDto(r.BotInstructions, r.WelcomeMessage, BotRules.MaxLength)).FirstOrDefaultAsync(ct)
+                is { } dto ? Results.Ok(dto) : Results.NotFound());
+
+        one.MapPut("/bot-rules", async (int rid, BotRulesInput input, AppDbContext db, CancellationToken ct) =>
+        {
+            var r = await db.Restaurants.FirstOrDefaultAsync(x => x.Id == rid, ct);
+            if (r is null) return Results.NotFound();
+            var rules = BotRules.Clean(input.Instructions);
+            if (rules is not null && rules.Length > BotRules.MaxLength)
+                return Bad($"Too long ({rules.Length:N0} characters). Keep the rules short, at most {BotRules.MaxLength:N0} characters.");
+            var welcome = Clean(input.WelcomeMessage);
+            if (welcome is not null && welcome.Length > 500)
+                return Bad("Keep the welcome message under 500 characters.");
+            r.BotInstructions = rules;
+            r.WelcomeMessage = welcome;
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(new BotRulesDto(r.BotInstructions, r.WelcomeMessage, BotRules.MaxLength));
+        });
+
+        // "This reply was wrong, it should be...": saved as a rule the bot follows from the next message.
+        one.MapPost("/bot-rules/correction", async (int rid, CorrectionInput input, AppDbContext db, CancellationToken ct) =>
+        {
+            var r = await db.Restaurants.FirstOrDefaultAsync(x => x.Id == rid, ct);
+            if (r is null) return Results.NotFound();
+            if (BotRules.Correction(input.CustomerMessage, input.BotReply, input.BetterReply) is not { } rule)
+                return Bad("Write what the bot should have said.");
+            var rules = BotRules.Clean(string.IsNullOrWhiteSpace(r.BotInstructions) ? rule : r.BotInstructions + "\n" + rule)!;
+            if (rules.Length > BotRules.MaxLength)
+                return Bad("Your bot rules are full. Remove some old rules in Bot training first.");
+            r.BotInstructions = rules;
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(new BotRulesDto(r.BotInstructions, r.WelcomeMessage, BotRules.MaxLength));
         });
 
         // Turns one file into example text for the owner to review (nothing is saved here):
@@ -308,20 +351,22 @@ public static class RestaurantEndpoints
 
     private static RestaurantProfile ToProfile(Restaurant r) => new(
         r.Id, r.Name, r.WhatsAppPhoneNumberId, r.IsBotEnabled, r.BotTone, r.Address, r.Timings, r.DeliveryAreas,
-        r.MinimumOrder, r.PaymentMethods, r.ExtraInfo, r.Currency, r.StaffWhatsAppNumber);
+        r.MinimumOrder, r.PaymentMethods, r.ExtraInfo, r.Currency, r.StaffWhatsAppNumber,
+        r.BusinessType, r.BusinessDescription, r.TakesOrders, r.TakesBookings);
 
     public sealed record NewRestaurantInput(string? Name, string? WhatsAppPhoneNumberId, int? OrganizationId = null);
 
     public sealed record RestaurantProfile(
         int Id, string? Name, string? WhatsAppPhoneNumberId, bool IsBotEnabled, string? BotTone, string? Address,
         string? Timings, string? DeliveryAreas, decimal? MinimumOrder, string? PaymentMethods, string? ExtraInfo,
-        string? Currency, string? StaffWhatsAppNumber);
+        string? Currency, string? StaffWhatsAppNumber,
+        BusinessType? BusinessType = null, string? BusinessDescription = null, bool? TakesOrders = null, bool? TakesBookings = null);
 
     public sealed record MenuItemInput(string? Category, string? Name, string? Description, decimal Price, bool IsAvailable, int? SortOrder)
     {
         public string? Validate() =>
             string.IsNullOrWhiteSpace(Category) ? "Category is required."
-            : string.IsNullOrWhiteSpace(Name) ? "Dish name is required."
+            : string.IsNullOrWhiteSpace(Name) ? "Name is required."
             : Price < 0 ? "Price can't be negative." : null;
 
         public void Apply(MenuItem m)
@@ -372,6 +417,9 @@ public static class RestaurantEndpoints
     }
 
     public sealed record TrainingDto(string? Text, int MaxLength);
+    public sealed record BotRulesDto(string? Instructions, string? WelcomeMessage, int MaxLength);
+    public sealed record BotRulesInput(string? Instructions, string? WelcomeMessage);
+    public sealed record CorrectionInput(string? CustomerMessage, string? BotReply, string? BetterReply);
     public sealed record TrainingInput(string? Text);
     public sealed record TrainingImport(string? FileName, string? Text, string? ImageBase64, string? MediaType);
 }

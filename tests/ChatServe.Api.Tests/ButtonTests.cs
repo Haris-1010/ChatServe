@@ -244,4 +244,33 @@ public class ButtonTests
         Assert.Contains("show_options", prompt);
         Assert.Contains("Customers prefer tapping to typing", prompt);
     }
+    [Fact]
+    public async Task Choices_without_text_still_reach_the_customer_instead_of_the_trouble_message()
+    {
+        // Seen live: customer tapped a dish, the AI showed quantity buttons but wrote no text → "having trouble replying".
+        await using var c = await NewAsync();
+        c.Ai.ToolScript = async (_, exec) =>
+        {
+            await exec.ExecuteAsync("show_options", FakeChatCompletionClient.Input(new
+            {
+                options = new[] { new { title = "1", description = "" }, new { title = "2", description = "" } },
+                list_button = "",
+            }), default);
+            return new AiResult(null, false, 100, 10, 0, 1);
+        };
+
+        var reply = await c.Generator().GenerateReplyAsync(Text(CustomerPhone, "Chiken Half Tikka"), default);
+
+        Assert.NotEqual(ClaudeReplyGenerator.FallbackReply, reply);
+        Assert.Equal(CustomerText.ChooseBelow(false), reply);
+        Assert.Equal(["1", "2"], c.Buttons.Value!.Options.Select(o => o.Title));
+    }
+
+    [Fact]
+    public void Text_written_next_to_a_tool_call_is_kept_when_the_last_round_is_empty()
+    {
+        Assert.Equal("Kitne plate chahiye?", ClaudeChatCompletionClient.FinalText("", ["Kitne plate chahiye?"]));
+        Assert.Equal("Final", ClaudeChatCompletionClient.FinalText("Final", ["earlier"]));
+        Assert.Null(ClaudeChatCompletionClient.FinalText(" ", []));
+    }
 }

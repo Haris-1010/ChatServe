@@ -10,9 +10,22 @@ export type OrderType = 'Delivery' | 'Takeaway' | 'DineIn';
 export type BookingStatus = 'Requested' | 'Confirmed' | 'Cancelled';
 export type ChatRole = 'Customer' | 'Bot' | 'Staff';
 
+export type BusinessType = 'Restaurant' | 'Shop' | 'Services' | 'Other';
+
 export interface RestaurantSummary {
   id: number; name: string; whatsAppPhoneNumberId: string; isBotEnabled: boolean;
   organizationId: number; organizationName: string;
+  businessType: BusinessType; takesOrders: boolean; takesBookings: boolean;
+}
+
+/** The words the dashboard uses for each kind of business. */
+export function termsFor(type: BusinessType | null | undefined) {
+  switch (type) {
+    case 'Shop': return { place: 'Shop', items: 'Products', item: 'Product', icon: '🛍️', bookings: 'Bookings' };
+    case 'Services': return { place: 'Business', items: 'Services', item: 'Service', icon: '💼', bookings: 'Appointments' };
+    case 'Other': return { place: 'Business', items: 'Products & services', item: 'Item', icon: '📦', bookings: 'Bookings' };
+    default: return { place: 'Restaurant', items: 'Menu', item: 'Dish', icon: '🍛', bookings: 'Bookings' };
+  }
 }
 
 export interface RestaurantProfile {
@@ -20,6 +33,7 @@ export interface RestaurantProfile {
   botTone: string | null; address: string | null; timings: string | null; deliveryAreas: string | null;
   minimumOrder: number | null; paymentMethods: string | null; extraInfo: string | null;
   currency: string; staffWhatsAppNumber: string | null;
+  businessType: BusinessType; businessDescription: string | null; takesOrders: boolean; takesBookings: boolean;
 }
 
 export interface MenuItem { id: number; category: string; name: string; description: string | null; price: number; isAvailable: boolean; sortOrder: number; }
@@ -169,6 +183,7 @@ export interface ConnectRequest { code: string; wabaId: string; phoneNumberId: s
 export interface ConnectionUpdate { mode: WhatsAppMode; whatsAppBusinessAccountId: string | null; accessToken: string | null; pauseBotOnPhoneReply: boolean; }
 
 export interface Training { text: string | null; maxLength: number; }
+export interface BotRules { instructions: string | null; welcomeMessage: string | null; maxLength: number; }
 export interface TrainingFile { fileName: string; text?: string; imageBase64?: string; mediaType?: string; }
 
 @Injectable({ providedIn: 'root' })
@@ -227,6 +242,14 @@ export class Api {
   testRestaurantWhatsApp(rid: number) { return this.post<TestResult>(`/api/restaurants/${rid}/whatsapp/test`); }
   training(rid: number) { return this.get<Training>(`/api/restaurants/${rid}/training`); }
   saveTraining(rid: number, text: string) { return this.put<Training>(`/api/restaurants/${rid}/training`, { text }); }
+  botRules(rid: number) { return this.get<BotRules>(`/api/restaurants/${rid}/bot-rules`); }
+  saveBotRules(rid: number, instructions: string, welcomeMessage: string) {
+    return this.put<BotRules>(`/api/restaurants/${rid}/bot-rules`, { instructions, welcomeMessage });
+  }
+  /** "The bot said X, it should have said Y": saved as a rule. */
+  correctBot(rid: number, customerMessage: string | null, botReply: string, betterReply: string) {
+    return this.post<BotRules>(`/api/restaurants/${rid}/bot-rules/correction`, { customerMessage, botReply, betterReply });
+  }
   importTraining(rid: number, file: TrainingFile) { return this.post<{ text: string }>(`/api/restaurants/${rid}/training/import`, file); }
 
   /** Menu, deals, FAQs, zones: the same CRUD endpoints for each. */
@@ -283,6 +306,9 @@ export class CurrentRestaurant {
   }
 
   get current() { return this.list().find(r => r.id === this.id()) ?? null; }
+
+  /** Words for the selected business (Menu vs Products vs Services). */
+  get terms() { return termsFor(this.current?.businessType); }
 
   /** Restaurants grouped by client, for the switcher. */
   groups() {
