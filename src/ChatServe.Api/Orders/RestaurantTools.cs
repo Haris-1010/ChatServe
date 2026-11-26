@@ -27,6 +27,8 @@ public static class RestaurantTools
     public static IReadOnlyList<AiTool> Build(Restaurant r)
     {
         var areas = r.DeliveryZones.Where(z => z.IsActive).OrderBy(z => z.Id).Select(z => z.Name).Append(NoArea).ToArray();
+        var terms = BusinessTerms.For(r.BusinessType);
+        var orderTypes = SystemPromptBuilder.OrderTypes(r, areas.Length > 1).Select(x => x.Value).ToArray();
 
         var placeOrder = new
         {
@@ -42,7 +44,7 @@ public static class RestaurantTools
                         type = "object",
                         properties = new Dictionary<string, object>
                         {
-                            ["code"] = new { type = "string", description = "Item code from the menu, e.g. M3 or D1." },
+                            ["code"] = new { type = "string", description = "Item code from the list, e.g. M3 or D1." },
                             ["quantity"] = new { type = "integer", description = "How many, 1 or more." },
                             ["note"] = new { type = "string", description = "Special request for this item (e.g. less spicy), or empty string." },
                         },
@@ -50,7 +52,7 @@ public static class RestaurantTools
                         additionalProperties = false,
                     },
                 },
-                ["order_type"] = new { type = "string", @enum = new[] { "delivery", "takeaway", "dine_in" } },
+                ["order_type"] = new { type = "string", @enum = orderTypes, description = "takeaway = the customer picks it up." },
                 ["customer_name"] = new { type = "string", description = "Name the customer gave for the order." },
                 ["delivery_address"] = new { type = "string", description = "Full delivery address. Empty string if not delivery." },
                 ["delivery_area"] = new { type = "string", @enum = areas, description = $"Delivery area from the list. \"{NoArea}\" if not delivery." },
@@ -73,7 +75,7 @@ public static class RestaurantTools
                 ["date"] = new { type = "string", description = "YYYY-MM-DD (Pakistan time). Work it out from the current time note." },
                 ["time"] = new { type = "string", description = "24-hour HH:MM, e.g. 20:30." },
                 ["people"] = new { type = "integer" },
-                ["notes"] = new { type = "string", description = "Any request (family hall, birthday, high chair), or empty string." },
+                ["notes"] = new { type = "string", description = terms.BookingHasPeople ? "Any request (family hall, birthday, high chair), or empty string." : "What the booking is for (e.g. the service) and any request, or empty string." },
             },
             required = new[] { "customer_name", "date", "time", "people", "notes" },
             additionalProperties = false,
@@ -111,35 +113,40 @@ public static class RestaurantTools
                         additionalProperties = false,
                     },
                 },
-                ["list_button"] = new { type = "string", description = "Only for 4 or more options: the text on the button that opens the list (max 20), e.g. \"Menu dekhein\". Empty string otherwise." },
+                ["list_button"] = new { type = "string", description = "Only for 4 or more options: the text on the button that opens the list (max 20), e.g. \"See menu\". Empty string otherwise." },
             },
             required = new[] { "options", "list_button" },
             additionalProperties = false,
         };
 
-        return
-        [
-            new AiTool(PlaceOrder,
+        var tools = new List<AiTool>();
+        if (r.TakesOrders)
+        {
+            tools.Add(new AiTool(PlaceOrder,
                 "Create or replace the customer's order draft once you know the items, order type, the customer's name and, for delivery, " +
                 "the full address and area. The system calculates prices and totals and returns the order summary. The order is NOT sent to " +
-                "the kitchen until the customer replies \"confirm\". Call again with the full updated order if the customer changes anything.",
-                Json(placeOrder)),
-            new AiTool(GetOrderStatus,
-                "Get the status of this customer's recent orders. Use when they ask where their order is or about an order they placed.",
-                Json(empty)),
-            new AiTool(BookTable,
-                "Request a table booking once you have the name, date, time and number of people. Staff will confirm it.",
-                Json(bookTable)),
-            new AiTool(HandoverToHuman,
-                "Hand the chat to a staff member: complaints, refunds, cancelling or changing an already confirmed order, bulk/event orders, " +
-                "the customer asks for a human, or anything you can't handle. The bot stops replying to this customer after this.",
-                Json(handover)),
-            new AiTool(ShowOptions,
-                "Show tappable choices under your reply (WhatsApp buttons for up to 3 short options, a list for 4 to 10). Use it whenever the " +
-                "customer has to pick something: a menu category, a dish, quantity, delivery/takeaway/dine-in, delivery area, payment method, " +
-                "yes/no. The customer's tap comes back to you as the option's title. Call it once, then write your reply text.",
-                Json(showOptions)),
-        ];
+                "the team until the customer replies \"confirm\". Call again with the full updated order if the customer changes anything.",
+                Json(placeOrder)));
+        }
+        tools.Add(new AiTool(GetOrderStatus,
+            "Get the status of this customer's recent orders. Use when they ask where their order is or about an order they placed.",
+            Json(empty)));
+        if (r.TakesBookings)
+        {
+            tools.Add(new AiTool(BookTable,
+                $"Request a {terms.BookingWord} once you have the name, date, time{(terms.BookingHasPeople ? " and number of people" : "")}. The team will confirm it.",
+                Json(bookTable)));
+        }
+        tools.Add(new AiTool(HandoverToHuman,
+            "Hand the chat to a team member: complaints, refunds, cancelling or changing an already confirmed order, bulk orders, " +
+            "the customer asks for a human, or anything you can't handle. The bot stops replying to this customer after this.",
+            Json(handover)));
+        tools.Add(new AiTool(ShowOptions,
+            "Show tappable choices under your reply (WhatsApp buttons for up to 3 short options, a list for 4 to 10). Use it whenever the " +
+            "customer has to pick something: a category, an item, quantity, order type, delivery area, payment method, yes/no. " +
+            "The customer's tap comes back to you as the option's title. Always also write a short reply text.",
+            Json(showOptions)));
+        return tools;
     }
 
     private static string Json(object schema) => JsonSerializer.Serialize(schema);
@@ -245,7 +252,7 @@ public sealed class OrderToolExecutor(
                 if (options.Count == 0)
                     return new ToolOutcome("Give at least one option with a title.", IsError: true);
                 if (options.Count > InteractiveMessage.MaxRows)
-                    return new ToolOutcome($"At most {InteractiveMessage.MaxRows} options fit. Show the most useful {InteractiveMessage.MaxRows} and say they can type any other dish.", IsError: true);
+                    return new ToolOutcome($"At most {InteractiveMessage.MaxRows} options fit. Show the most useful {InteractiveMessage.MaxRows} and say they can type any other.", IsError: true);
 
                 var asButtons = options.Count <= InteractiveMessage.MaxButtons && options.All(o => o.Title.Length <= 20) &&
                                 options.All(o => string.IsNullOrEmpty(o.Description));

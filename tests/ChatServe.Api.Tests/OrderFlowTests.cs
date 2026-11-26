@@ -222,7 +222,7 @@ public class OrderFlowTests
         Assert.Equal(6, booking.People);
         Assert.Equal(new TimeSpan(20, 30, 0), booking.BookingTime.TimeOfDay);
         Assert.Contains("request", toolText);
-        Assert.Contains("TABLE BOOKING", Assert.Single(c.Staff.Alerts));
+        Assert.Contains("BOOKING REQUEST", Assert.Single(c.Staff.Alerts));
     }
 
     [Fact]
@@ -257,7 +257,7 @@ public class OrderFlowTests
         };
         await gen.GenerateReplyAsync(Msg("mera order kahan hai?"), default);
 
-        Assert.Contains("confirmed, sent to kitchen", status);
+        Assert.Contains("): confirmed", status);
         Assert.Contains("Rs 2,700", status);
     }
 

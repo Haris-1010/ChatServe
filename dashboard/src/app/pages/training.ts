@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api } from '../core/api';
+import { Api, CurrentRestaurant } from '../core/api';
 import { onRestaurant } from '../core/page';
 import { errorText, Toasts } from '../core/toast';
 
@@ -15,10 +15,44 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
     <div class="card form-col">
       <div>
-        <b>Teach the bot how your restaurant talks</b>
+        <b>1. Bot rules</b>
+        <div class="muted small">
+          Tell the bot what to do, in your own words. One rule per line, in English or Roman Urdu. No code needed:
+          the bot follows these from the next message. Facts like prices and timings go in {{ terms.items }} and Business info.
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Welcome message (when a customer says hi)</span>
+        <input [(ngModel)]="welcome" [placeholder]="welcomeHint()" maxlength="500" />
+        <small>Optional. The bot sends it in the customer's language, with buttons to choose from.</small>
+      </label>
+
+      <label class="field">
+        <span>Rules</span>
+        <textarea rows="8" [(ngModel)]="rules" placeholder="- Always call the customer 'sir' or 'madam'&#10;- Offer the family deal when someone orders 2 or more items"></textarea>
+        <small [class.over]="rules().length > rulesMax()">{{ rules().length.toLocaleString() }} / {{ rulesMax().toLocaleString() }} characters</small>
+      </label>
+
+      <div>
+        <div class="muted small">Tap to add a ready-made rule:</div>
+        <div class="chips">
+          @for (s of suggestions(); track s) { <button class="chip" type="button" (click)="addRule(s)">+ {{ s }}</button> }
+        </div>
+      </div>
+
+      <div class="row">
+        <button class="btn primary" (click)="saveRules()" [disabled]="busy() || rules().length > rulesMax()">Save rules</button>
+      </div>
+      <div class="muted small">Tip: in <b>Test the bot</b>, press <b>✏️ Correct</b> under any wrong reply and write what it should have said. It's added here as a rule.</div>
+    </div>
+
+    <div class="card form-col">
+      <div>
+        <b>2. Teach the bot how you talk (example chats)</b>
         <div class="muted small">
           Add old WhatsApp chats with your customers. The bot copies your tone, greetings and way of writing
-          (for example Roman Urdu, "Ji sir", "bhai"). Prices, menu and timings always come from Menu and Restaurant info, not from these chats.
+          (for example Roman Urdu, "Ji sir", "bhai"). Prices and timings always come from {{ terms.items }} and Business info, not from these chats.
         </div>
       </div>
 
@@ -28,7 +62,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
           <li><b>Export a chat (best):</b> in WhatsApp open a customer chat → ⋮ → More → <i>Export chat</i> → <i>Without media</i>. Upload the .txt file here.</li>
           <li><b>Screenshots:</b> upload chat screenshots (JPG/PNG). The AI reads the text out of them.</li>
           <li><b>Or type / paste</b> example conversations below, like:<br />
-            <code>Customer: menu bhej dein</code><br /><code>Restaurant: Ji zaroor! Ye raha hamara menu 😊</code></li>
+            <code>Customer: menu bhej dein</code><br /><code>Business: Ji zaroor! Ye rahi details 😊</code></li>
         </ul>
         5 to 10 good chats are enough. Phone numbers are hidden automatically. Check the text and remove anything private before saving.
       </div>
@@ -62,22 +96,74 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
     label.btn.disabled { opacity: .5; pointer-events: none; }
     .over { color: #e5484d; font-weight: 600; }
     code { font-size: 12px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   `],
 })
 export class TrainingPage {
   private api = inject(Api);
   private toasts = inject(Toasts);
+  private restaurants = inject(CurrentRestaurant);
+  protected get terms() { return this.restaurants.terms; }
+  rules = signal('');
+  welcome = signal('');
+  rulesMax = signal(6000);
+
+  welcomeHint = computed(() => {
+    const name = this.restaurants.current?.name ?? 'us';
+    return `Assalam o alaikum! ${name} mein khush aamdeed 😊 Aap kya dekhna chahenge?`;
+  });
+
+  suggestions = computed(() => {
+    const common = [
+      'Reply in Roman Urdu unless the customer writes in English',
+      "Call customers 'sir' or 'madam'",
+      'Keep replies very short',
+      'If someone asks for a discount, say a team member will reply',
+      'Never share the owner\'s personal number',
+    ];
+    switch (this.restaurants.current?.businessType) {
+      case 'Shop': return ['Always ask for the size and colour before taking an order', 'Delivery all over Pakistan takes 3-5 working days', 'Exchange within 7 days, no refunds', ...common];
+      case 'Services': return ['Always ask which service and a preferred time', 'Tell customers to arrive 10 minutes early', 'Prices can change after consultation: say so', ...common];
+      case 'Other': return common;
+      default: return ['Always suggest a drink with the order', 'Offer the family deal when someone orders for 4 or more people', 'Tell customers food is freshly made, so it takes 20-30 minutes', ...common];
+    }
+  });
+
+  addRule(rule: string) {
+    const now = this.rules().trim();
+    if (now.toLowerCase().includes(rule.toLowerCase())) return;
+    this.rules.set((now ? now + '\n' : '') + '- ' + rule);
+  }
+
+  async saveRules() {
+    const rid = this.current.id();
+    if (!rid) return;
+    this.busy.set(true);
+    try {
+      const r = await this.api.saveBotRules(rid, this.rules(), this.welcome());
+      this.rules.set(r.instructions ?? '');
+      this.welcome.set(r.welcomeMessage ?? '');
+      this.toasts.ok('Saved. The bot follows these rules from the next message.');
+    } catch (e) {
+      this.toasts.error(errorText(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
   text = signal('');
   maxLength = signal(20000);
   length = computed(() => this.text().length);
   busy = signal(false);
   importing = signal('');
-  placeholder = 'Customer: Assalam o alaikum, delivery hoti hai Johar Town mein?\nRestaurant: Walaikum assalam! Ji bilkul, Johar Town mein delivery hoti hai 😊 Kya order karna chahenge?';
+  placeholder = 'Customer: Assalam o alaikum, delivery hoti hai Johar Town mein?\nBusiness: Walaikum assalam! Ji bilkul, Johar Town mein delivery hoti hai 😊 Kya order karna chahenge?';
   private current = onRestaurant(rid => this.load(rid));
 
   async load(rid: number) {
     try {
-      const t = await this.api.training(rid);
+      const [t, r] = await Promise.all([this.api.training(rid), this.api.botRules(rid)]);
+      this.rules.set(r.instructions ?? '');
+      this.welcome.set(r.welcomeMessage ?? '');
+      this.rulesMax.set(r.maxLength);
       this.text.set(t.text ?? '');
       this.maxLength.set(t.maxLength);
     } catch (e) { this.toasts.error(errorText(e)); }

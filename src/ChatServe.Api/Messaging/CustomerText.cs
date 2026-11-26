@@ -61,7 +61,7 @@ public static partial class CustomerText
         };
         return $"✅ Shukriya {o.CustomerName}! Aap ka order *#{o.Id}* confirm ho gaya hai.\n" +
                $"Total: *{total}*{pay}\n" +
-               $"Order kitchen mein chala gaya hai. {next}";
+               $"Hamari team ne kaam shuru kar diya hai. {next}";
     }
 
     public static string DraftCancelled(bool ru) => ru
@@ -82,6 +82,9 @@ public static partial class CustomerText
     public static string Fallback(bool ru) => ru
         ? "Maaf kijiye, abhi jawab dene mein thori mushkil aa rahi hai. Hamari team jaldi yahin aap ko jawab de gi 🙏"
         : ClaudeReplyGenerator.FallbackReply;
+
+    /// <summary>The line above tappable choices when the AI wrote no text of its own.</summary>
+    public static string ChooseBelow(bool ru) => ru ? "Neeche se choose karein 👇" : "Please choose below 👇";
 
     public static string Handover(bool ru) => ru
         ? "Shukriya! Hamari team ka koi member jaldi yahin aap ko jawab de ga 🙏"

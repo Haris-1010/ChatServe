@@ -137,6 +137,11 @@ public sealed class ClaudeReplyGenerator(
                     "AI reply for {Restaurant}: in={In} out={Out} cacheRead={Cache} cacheWrite={CacheWrite} tools={Tools} refused={Refused}",
                     restaurant.Name, result.InputTokens, result.OutputTokens, result.CacheReadTokens, result.CacheWriteTokens, result.ToolCalls, result.Refused);
 
+                // The AI only put choices under its reply and wrote no text: show the choices with a short line,
+                // instead of telling the customer something went wrong.
+                if (!result.Refused && result.Text is null && tools.Options is not null && !tools.HandedOver && tools.Draft is null)
+                    result = result with { Text = CustomerText.ChooseBelow(ru) };
+
                 failed = result.Refused || result.Text is null;
                 reply = failed
                     ? tools.HandedOver ? CustomerText.Handover(ru) : CustomerText.Fallback(ru)

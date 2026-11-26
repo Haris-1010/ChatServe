@@ -90,6 +90,9 @@ public sealed class ClaudeChatCompletionClient(
         long input = 0, output = 0, cacheRead = 0, cacheWrite = 0;
         var toolCalls = 0;
         var maxRounds = Math.Max(1, opts.MaxToolRounds);
+        // Text the model wrote next to a tool call (e.g. "How many plates?" + show_options). The last round is often
+        // empty after a tool, so this text must not be lost, otherwise the customer gets the "trouble replying" message.
+        var earlierText = new List<string>();
 
         for (var round = 0; ; round++)
         {
@@ -119,12 +122,15 @@ public sealed class ClaudeChatCompletionClient(
             var text = string.Join("\n", response.Content.Select(b => b.Value).OfType<TextBlock>().Select(t => t.Text)).Trim();
 
             if (response.StopReason != "tool_use" || executor is null)
-                return new AiResult(string.IsNullOrWhiteSpace(text) ? null : text, false, input, output, cacheRead, toolCalls, cacheWrite);
+                return new AiResult(FinalText(text, earlierText), false, input, output, cacheRead, toolCalls, cacheWrite);
+
+            if (text.Length > 0)
+                earlierText.Add(text);
 
             if (round + 1 >= maxRounds)
             {
                 logger.LogWarning("Tool loop stopped after {Rounds} rounds", maxRounds);
-                return new AiResult(null, false, input, output, cacheRead, toolCalls, cacheWrite);
+                return new AiResult(FinalText("", earlierText), false, input, output, cacheRead, toolCalls, cacheWrite);
             }
 
             // The full assistant reply (thinking + tool_use) must be sent back, then all tool results in one user message.
@@ -168,6 +174,14 @@ public sealed class ClaudeChatCompletionClient(
             messages.Add(new AssistantMessageParam { Content = assistantContent });
             messages.Add(new UserMessageParam { Content = results });
         }
+    }
+
+    /// <summary>The final answer; if the last round wrote nothing, the text written before the tool calls.</summary>
+    internal static string? FinalText(string last, IReadOnlyList<string> earlier)
+    {
+        if (!string.IsNullOrWhiteSpace(last)) return last.Trim();
+        var joined = string.Join("\n", earlier).Trim();
+        return joined.Length == 0 ? null : joined;
     }
 
     private static ToolUnion ToSdkTool(AiTool tool)
